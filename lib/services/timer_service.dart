@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 import 'audio_service.dart';
 import 'notification_service.dart';
@@ -25,11 +25,16 @@ class TimerService extends ChangeNotifier {
   TimerMode _completedMode = TimerMode.focus;
   String? _lastCompletedSessionId;
   bool _wasSkipped = false;
+  DateTime? _endTime;
+  AppLifecycleListener? _lifecycleListener;
+
+  static const int _scheduledNotificationId = 1001;
 
   TimerService() {
     _sessionCount = DatabaseService.getSetting('sessionCount', defaultValue: 0);
     _seconds = DatabaseService.focusDuration * 60;
     _totalSeconds = DatabaseService.focusDuration * 60;
+    _lifecycleListener = AppLifecycleListener(onResume: _onResume);
   }
 
   void Function()? onSessionComplete;
@@ -163,6 +168,15 @@ class TimerService extends ChangeNotifier {
     if (_running) return;
     AudioService.stopAlarm();
     _running = true;
+    _endTime = DateTime.now().add(Duration(seconds: _seconds));
+    NotificationService.scheduleAt(
+      _endTime!,
+      title: _mode == TimerMode.focus ? 'Focus Session Complete!' : 'Break Over!',
+      body: _mode == TimerMode.focus
+          ? 'Great work! Time for a break.'
+          : 'Ready to focus again?',
+      id: _scheduledNotificationId,
+    );
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_seconds > 0) {
         _seconds--;
@@ -180,6 +194,8 @@ class TimerService extends ChangeNotifier {
   void pause() {
     _timer?.cancel();
     _running = false;
+    _endTime = null;
+    NotificationService.cancel(_scheduledNotificationId);
     AudioService.stopAlarm();
     notifyListeners();
   }
@@ -187,9 +203,23 @@ class TimerService extends ChangeNotifier {
   void reset() {
     _timer?.cancel();
     _running = false;
+    _endTime = null;
+    NotificationService.cancel(_scheduledNotificationId);
     AudioService.stopAlarm();
     _seconds = _totalSeconds;
     notifyListeners();
+  }
+
+  void _onResume() {
+    if (_running && _endTime != null) {
+      final remaining = _endTime!.difference(DateTime.now()).inSeconds;
+      if (remaining <= 0) {
+        _finish();
+      } else {
+        _seconds = remaining;
+        notifyListeners();
+      }
+    }
   }
 
   void skip() {
@@ -208,6 +238,8 @@ class TimerService extends ChangeNotifier {
   void _finish() {
     _timer?.cancel();
     _running = false;
+    _endTime = null;
+    NotificationService.cancel(_scheduledNotificationId);
 
     if (DatabaseService.soundEnabled) {
       AudioService.playFinish();
@@ -323,6 +355,7 @@ class TimerService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _lifecycleListener?.dispose();
     _timer?.cancel();
     AudioService.stopAlarm();
     super.dispose();

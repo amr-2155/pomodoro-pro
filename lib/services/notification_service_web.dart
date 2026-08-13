@@ -52,4 +52,13 @@ class NotificationService {
   static Future<void> cancelAll() async {
     if (kIsWeb) return;
   }
+
+  static Future<void> scheduleAt(
+    DateTime when, {
+    String title = 'Pomodoro',
+    String body = 'Session complete!',
+    int id = 1000,
+  }) async {}
+
+  static Future<void> cancel(int id) async {}
 }

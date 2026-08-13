@@ -7,6 +7,8 @@ Works on **Web (PWA)**, **Android (APK)**, and iOS — all from a single codebas
 ## ✨ Features
 
 - ⏱️ **Pomodoro Timer** — focus / short break / long break with full control
+- 🔕 **Background Timer (Android)** — exact scheduled notification fires even if the app is closed
+- 🔊 **Real Sound Effects** — tick, completion chime & alarm (Android + web)
 - 📁 **Projects** — organize sessions and track progress per project
 - ✅ **Tasks** — to-do list with estimated & completed pomodoros
 - 📊 **Statistics** — daily, weekly & monthly charts, start-of-week setting
