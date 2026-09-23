@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 import 'dart:js_interop';
 import 'completion_sound.dart';
+import 'vibration_service.dart';
 
 class AudioService {
   static web.HTMLAudioElement? _previewElement;
@@ -12,6 +13,7 @@ class AudioService {
   static bool get isPreviewPlaying => _previewPlaying;
   static bool _completionLooping = false;
   static bool get isCompletionLooping => _completionLooping;
+  static Timer? _vibrationTimer;
 
   static final Map<String, String> _urlCache = {};
 
@@ -95,7 +97,23 @@ class AudioService {
   static Future<void> stopCompletionLoop() async {
     if (!_completionLooping) return;
     _completionLooping = false;
+    _vibrationTimer?.cancel();
+    _vibrationTimer = null;
     await _stopElement(_completionElement);
+  }
+
+  /// Vibration-only alert (no sound): repeats until [stopCompletionLoop].
+  /// Mirrors the mobile implementation for the restore path.
+  static Future<void> startVibrationOnly() async {
+    _completionLooping = true;
+    _vibrationTimer?.cancel();
+    try {
+      await VibrationService.vibrate(duration: 400);
+      _vibrationTimer =
+          Timer.periodic(const Duration(milliseconds: 1800), (_) {
+        if (_completionLooping) VibrationService.vibrate(duration: 400);
+      });
+    } catch (_) {}
   }
 
   static Future<void> playCountdownTick([CountdownSoundType? type]) async {
@@ -112,6 +130,8 @@ class AudioService {
   static Future<void> stopAllSounds() async {
     _completionLooping = false;
     _previewPlaying = false;
+    _vibrationTimer?.cancel();
+    _vibrationTimer = null;
     await _stopElement(_previewElement);
     await _stopElement(_completionElement);
     await _stopElement(_countdownElement);
