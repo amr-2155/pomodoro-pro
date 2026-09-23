@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local archives
 lib.zip
+
+# Landing site lives in its own repo (amr-2155/pomodoro-landing)
+/landing/

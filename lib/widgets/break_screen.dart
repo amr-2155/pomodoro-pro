@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/audio_service.dart';
+import '../services/completion_sound.dart';
+import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../services/ambient_sound_service.dart';
+import 'package:pomodoro_app/l10n/app_localizations.dart';
 
 class BreakScreen extends StatefulWidget {
-  final int breakMinutes;
+  final int breakSeconds;
   final VoidCallback onBreakComplete;
 
   const BreakScreen({
     super.key,
-    required this.breakMinutes,
+    required this.breakSeconds,
     required this.onBreakComplete,
   });
 
@@ -27,28 +30,15 @@ class _BreakScreenState extends State<BreakScreen>
   bool _isPaused = false;
   double _ambientVolume = 0.4;
 
-  static const _tips = [
-    'Close your eyes and take 5 deep breaths.',
-    'Stand up and stretch your arms above your head.',
-    'Look at something far away for 20 seconds.',
-    'Drink a glass of water to stay hydrated.',
-    'Roll your shoulders backwards 10 times.',
-    'Walk around for a minute to boost circulation.',
-    'Massage your hands and fingers gently.',
-    'Do 10 neck rotations slowly.',
-    'Rest your eyes — close them for a minute.',
-    'Take a moment to appreciate what you accomplished.',
-    'Write down 3 things you are grateful for.',
-    'Listen to your favorite calming song.',
-  ];
+  List<String> get _tips => AppLocalizations.of(context).breakTips;
 
   @override
   void initState() {
     super.initState();
-    _remainingSeconds = widget.breakMinutes * 60;
+    _remainingSeconds = widget.breakSeconds;
     _animController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: widget.breakMinutes * 60),
+      duration: Duration(seconds: widget.breakSeconds),
     )..forward();
     _startTimer();
   }
@@ -65,7 +55,9 @@ class _BreakScreenState extends State<BreakScreen>
         }
       } else {
         t.cancel();
-        AudioService.playFinish();
+        AudioService.playCompletionSound(
+          completionSoundFromKey(DatabaseService.completionSoundType),
+        );
         widget.onBreakComplete();
       }
     });
@@ -93,8 +85,8 @@ class _BreakScreenState extends State<BreakScreen>
     return '$m:$s';
   }
 
-  double get _progress => widget.breakMinutes * 60 > 0
-      ? 1.0 - (_remainingSeconds / (widget.breakMinutes * 60))
+  double get _progress => widget.breakSeconds > 0
+      ? 1.0 - (_remainingSeconds / widget.breakSeconds)
       : 0.0;
 
   @override
@@ -104,7 +96,9 @@ class _BreakScreenState extends State<BreakScreen>
     final size = (screenWidth * 0.62).clamp(180.0, 280.0);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A1A2F) : const Color(0xFFE8F5E9),
+      backgroundColor: isDark
+          ? AppColors.backgroundDark
+          : const Color(0xFFF0F7F2),
       body: SafeArea(
         child: Column(
           children: [
@@ -119,7 +113,9 @@ class _BreakScreenState extends State<BreakScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   fontStyle: FontStyle.italic,
-                  color: isDark ? Colors.green[200] : Colors.green[800],
+                  color: isDark
+                      ? AppColors.tasbeehGreen.withValues(alpha: 0.9)
+                      : const Color(0xFF1E5B33),
                 ),
               ),
             ),
@@ -155,14 +151,14 @@ class _BreakScreenState extends State<BreakScreen>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Break Time',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.success,
-                          fontWeight: FontWeight.w600,
+                        Text(
+                          AppLocalizations.of(context).breakTime,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -187,20 +183,20 @@ class _BreakScreenState extends State<BreakScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                          color: _isPaused ? Colors.white : AppColors.success,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _isPaused ? 'Resume' : 'Pause',
-                          style: TextStyle(
+                          Icon(
+                            _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                             color: _isPaused ? Colors.white : AppColors.success,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                            size: 20,
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _isPaused ? AppLocalizations.of(context).resume : AppLocalizations.of(context).pause,
+                            style: TextStyle(
+                              color: _isPaused ? Colors.white : AppColors.success,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -209,7 +205,7 @@ class _BreakScreenState extends State<BreakScreen>
                 GestureDetector(
                   onTap: () {
                     _timer?.cancel();
-                    AudioService.stopAlarm();
+                    AudioService.stopAllSounds();
                     widget.onBreakComplete();
                   },
                   child: Container(
@@ -217,15 +213,15 @@ class _BreakScreenState extends State<BreakScreen>
                     decoration: BoxDecoration(
                       color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text(
+                    AppLocalizations.of(context).skipBreak,
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.grey[700],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
-                    child: Text(
-                      'Skip Break',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.grey[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
+                  ),
                   ),
                 ),
               ],
@@ -241,7 +237,7 @@ class _BreakScreenState extends State<BreakScreen>
     return Column(
       children: [
         Text(
-          'Ambient Sounds',
+          AppLocalizations.of(context).ambientSounds,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,

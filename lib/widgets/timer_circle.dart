@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 
 class TimerCircle extends StatefulWidget {
-  final double progress;
+  final double? progress;
   final String time;
   final String label;
   final Color color;
@@ -12,7 +12,7 @@ class TimerCircle extends StatefulWidget {
 
   const TimerCircle({
     super.key,
-    required this.progress,
+    this.progress,
     required this.time,
     required this.label,
     required this.color,

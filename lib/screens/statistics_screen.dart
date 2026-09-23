@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pomodoro_app/l10n/app_localizations.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/session.dart';
 import '../services/database_service.dart';
@@ -18,6 +19,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   String _chartView = 'week';
   String? _filterProjectId;
 
+  AppLocalizations get l10n => AppLocalizations.of(context);
+
   List<Session> _filteredSessions({String? projectId, DateTime? since}) {
     var sessions = DatabaseService.getAllSessions().where((s) => s.completed);
     if (projectId != null) sessions = sessions.where((s) => s.projectId == projectId);
@@ -29,21 +32,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     return _filteredSessions(projectId: _filterProjectId, since: startOfDay)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _filteredWeekMinutes() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     return _filteredSessions(projectId: _filterProjectId, since: startOfWeek)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _filteredMonthMinutes() {
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     return _filteredSessions(projectId: _filterProjectId, since: startOfMonth)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _filteredTodaySessions() {
@@ -54,7 +57,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   int _filteredWeekSessions() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     return _filteredSessions(projectId: _filterProjectId, since: startOfWeek).length;
   }
 
@@ -63,16 +66,16 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final lastMonth = DateTime(now.year, now.month - 1, 1);
     return DatabaseService.getAllSessions()
         .where((s) => s.completed && s.date.year == lastMonth.year && s.date.month == lastMonth.month)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _getLastWeekMinutes() {
     final now = DateTime.now();
-    final thisWeekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final thisWeekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
     return DatabaseService.getAllSessions()
         .where((s) => s.completed && !s.date.isBefore(lastWeekStart) && s.date.isBefore(thisWeekStart))
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   @override
@@ -86,19 +89,19 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final weekSessions = _filteredWeekSessions();
     final avgDuration = DatabaseService.getAverageSessionDuration();
     final bestProject = DatabaseService.getBestProjectThisWeek();
-    final dailyGoal = DatabaseService.dailyGoal;
+    final dailyGoalMin = DatabaseService.dailyTargetMinutes;
     final streak = _filterProjectId != null ? _getFilteredStreak() : DatabaseService.getOverallStreak();
     final totalMinutes = _filterProjectId != null ? _getFilteredTotalMinutes() : DatabaseService.getTotalAllTimeMinutes();
     final totalSessions = _filterProjectId != null ? _getFilteredTotalSessions() : DatabaseService.getTotalAllTimeSessions();
     final projectBreakdown = _filterProjectId != null ? _getFilteredProjectBreakdown() : DatabaseService.getProjectBreakdown();
 
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final dayNames = [l10n.sat, l10n.sun, l10n.mon, l10n.tue, l10n.wed, l10n.thu, l10n.fri];
     final goalProgress =
-        dailyGoal > 0 ? (todayMinutes / (dailyGoal * 60.0)) : 0.0;
+        dailyGoalMin > 0 ? (todayMinutes / dailyGoalMin) : 0.0;
 
     final displayMinutes = _chartView == 'week' ? dailyMinutes : _getMonthlyChart();
     final displayMax = displayMinutes.reduce((a, b) => a > b ? a : b);
-    final displayLabels = _chartView == 'week' ? dayNames : List.generate(4, (i) => 'W${i + 1}');
+    final displayLabels = _chartView == 'week' ? dayNames : ['W4', 'W3', 'W2', 'W1'];
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -107,12 +110,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Statistics',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
+              l10n.statistics,
+              style: Theme.of(context).textTheme.displaySmall,
             ),
             const SizedBox(height: 4),
             GestureDetector(
@@ -122,14 +121,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   AppPageRoute(page: const SessionHistoryScreen()),
                 );
               },
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.history_rounded, size: 14, color: AppColors.primary),
-                  SizedBox(width: 4),
+                  const Icon(Icons.history_rounded, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 4),
                   Text(
-                    'View All Sessions',
-                    style: TextStyle(
+                    l10n.viewAllSessions,
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
@@ -145,9 +144,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               children: [
                 Expanded(
                   child: _buildStatCard(
-                    'Today',
-                    '${todayMinutes}min',
-                    '$todaySessions sessions',
+                    l10n.today,
+                    '${todayMinutes}${l10n.minShort}',
+                    '$todaySessions ${l10n.sessionsCount}',
                     Icons.access_time_rounded,
                     AppColors.focusColor,
                     isDark,
@@ -156,9 +155,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    'This Week',
-                    '${weekMinutes}min',
-                    '$weekSessions sessions',
+                    l10n.thisWeek,
+                    '${weekMinutes}${l10n.minShort}',
+                    '$weekSessions ${l10n.sessionsCount}',
                     Icons.calendar_view_week_rounded,
                     AppColors.success,
                     isDark,
@@ -171,8 +170,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               children: [
                 Expanded(
                   child: _buildStatCard(
-                    'This Month',
-                    '${monthMinutes}min',
+                    l10n.thisMonth,
+                    '${monthMinutes}${l10n.minShort}',
                     '',
                     Icons.calendar_month_rounded,
                     AppColors.warning,
@@ -182,8 +181,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
-                    'Avg Session',
-                    '${avgDuration.toStringAsFixed(0)}min',
+                    l10n.avgSession,
+                    '${avgDuration.toStringAsFixed(0)}${l10n.minShort}',
                     '',
                     Icons.timer_rounded,
                     AppColors.accent,
@@ -193,11 +192,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ],
             ),
             const SizedBox(height: 16),
+            _buildGoalStats(isDark),
+            const SizedBox(height: 16),
             _buildMonthComparison(isDark),
             const SizedBox(height: 20),
             _buildProjectFilter(isDark),
             const SizedBox(height: 16),
-            _buildDailyGoalCard(todayMinutes, dailyGoal, goalProgress, isDark),
+            _buildDailyGoalCard(todayMinutes, dailyGoalMin, goalProgress, isDark),
             const SizedBox(height: 16),
             _buildTodayTimeline(isDark),
             _buildChartPeriodToggle(isDark),
@@ -233,7 +234,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             AppColors.primary.withValues(alpha: 0.75),
           ],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.3),
@@ -246,29 +247,29 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildOverallStat(
-              '🔥', '$streak', 'Day Streak', Colors.white),
+              Icons.local_fire_department_rounded, '$streak', l10n.dayStreak, Colors.white),
           Container(
               height: 40,
               width: 1,
               color: Colors.white.withValues(alpha: 0.2)),
           _buildOverallStat(
-              '⏱️', '${(totalMinutes / 60).toStringAsFixed(0)}h', 'Total Time', Colors.white),
+              Icons.timer_rounded, '${(totalMinutes / 60).toStringAsFixed(0)}h', l10n.totalTime, Colors.white),
           Container(
               height: 40,
               width: 1,
               color: Colors.white.withValues(alpha: 0.2)),
           _buildOverallStat(
-              '🎯', '$totalSessions', 'Sessions', Colors.white),
+              Icons.flag_rounded, '$totalSessions', l10n.sessionsCount, Colors.white),
         ],
       ),
     );
   }
 
   Widget _buildOverallStat(
-      String emoji, String value, String label, Color color) {
+      IconData icon, String value, String label, Color color) {
     return Column(
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 20)),
+        Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.9)),
         const SizedBox(height: 4),
         Text(
           value,
@@ -325,7 +326,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Text(
-                "Today's Timeline",
+                l10n.timeline,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -340,7 +341,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${sessions.length} sessions',
+                  '${sessions.length} ${l10n.sessionsCount}',
                    style: const TextStyle(
                      fontSize: 11,
                      fontWeight: FontWeight.w600,
@@ -426,7 +427,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  project?.name ?? 'Focus Session',
+                                  project?.name ?? l10n.focusSession,
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -453,7 +454,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '${s.durationMinutes}min',
+                                s.sessionType == 'tasbeeh'
+                                    ? '${l10n.tasbeehType} • ${s.count ?? 0} ${l10n.timesWord}'
+                                    : '${(s.actualMinutes ?? s.durationMinutes)}${l10n.minShort}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -471,7 +474,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                           : Icons.star_border_rounded,
                                       size: 12,
                                       color: idx < s.rating!
-                                          ? Colors.amber
+                                          ? AppColors.star
                                           : Colors.grey,
                                     );
                                   }),
@@ -493,7 +496,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   Widget _buildDailyGoalCard(
-      int todayMinutes, int dailyGoal, double goalProgress, bool isDark) {
+      int todayMinutes, int dailyGoalMin, double goalProgress, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -525,7 +528,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                'Daily Goal: ${dailyGoal}h',
+                '${l10n.dailyGoalStat}: ${dailyGoalMin}${l10n.minShort}',
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold),
               ),
@@ -540,7 +543,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${(goalProgress * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                  '${(goalProgress * 100).toStringAsFixed(0)}%',
                   style: TextStyle(
                     fontSize: 13,
                     color: goalProgress >= 1
@@ -568,7 +571,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            '$todayMinutes min of ${dailyGoal * 60} min',
+            '$todayMinutes ${l10n.dailyGoalProgress} $dailyGoalMin min',
             style: TextStyle(color: Colors.grey[500], fontSize: 13),
           ),
         ],
@@ -578,6 +581,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   Widget _buildWeeklyChart(List<double> dailyMinutes, List<String> dayNames,
       double maxMinutes, bool isDark) {
+    // RTL: reverse so Saturday is on the right side.
+    final rMin = List<double>.from(dailyMinutes.reversed);
+    final rName = List<String>.from(dayNames.reversed);
+    final rToday = 6 - ((DateTime.now().weekday + 1) % 7);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -608,10 +615,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     color: AppColors.warning, size: 18),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Weekly Overview',
+              Text(
+                l10n.weeklyOverview,
                 style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -626,7 +633,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
-                        '${rod.toY.toInt()}min',
+                        '${rod.toY.toInt()}${l10n.minShort}',
                         const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -643,13 +650,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index >= 0 && index < 7) {
-                          final isToday =
-                              index == DateTime.now().weekday - 1;
+                        if (index >= 0 && index < rName.length) {
+                          final isToday = index == rToday;
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              dayNames[index],
+                              rName[index],
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: isToday
@@ -700,13 +706,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   },
                 ),
                 borderData: FlBorderData(show: false),
-                barGroups: List.generate(7, (index) {
-                  final isToday = index == DateTime.now().weekday - 1;
+                barGroups: List.generate(rMin.length, (index) {
+                  final isToday = index == rToday;
                   return BarChartGroupData(
                     x: index,
                     barRods: [
                       BarChartRodData(
-                        toY: dailyMinutes[index],
+                        toY: rMin[index],
                         color: isToday
                             ? AppColors.primary
                             : AppColors.primary.withValues(alpha: 0.2),
@@ -760,10 +766,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     color: AppColors.accent, size: 18),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Project Breakdown',
+              Text(
+                l10n.projectBreakdown,
                 style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -874,7 +880,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Best Project This Week',
+                l10n.bestProjectThisWeek,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 12,
@@ -890,6 +896,215 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalStats(bool isDark) {
+    final goalMinutes = DatabaseService.dailyTargetMinutes;
+    final dailyData =
+        DatabaseService.getDailyCompletedMinutesThisWeek(onlyInWeeklyGoal: true);
+    final daysAchieved = goalMinutes > 0
+        ? dailyData.where((m) => m >= goalMinutes).length
+        : 0;
+    final bestDay = dailyData.isEmpty ? 0 : dailyData.reduce((a, b) => a > b ? a : b);
+    final weekTotal = dailyData.fold(0, (sum, m) => sum + m);
+    final daysSoFar = DateTime.now().weekday;
+    final dailyAvg = daysSoFar > 0 ? (weekTotal / daysSoFar).round() : 0;
+    final maxY = dailyData.isEmpty
+        ? 60.0
+        : (dailyData.reduce((a, b) => a > b ? a : b) * 1.2).clamp(60.0, 600.0);
+    final dayNames = [l10n.sat, l10n.sun, l10n.mon, l10n.tue, l10n.wed, l10n.thu, l10n.fri];
+    // RTL: reverse so Saturday is on the right.
+    final rData = List<int>.from(dailyData.reversed);
+    final rName = List<String>.from(dayNames.reversed);
+    final rToday = 6 - ((DateTime.now().weekday + 1) % 7);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flag_rounded,
+                    color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                l10n.goalStats,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _goalStatMini(
+                    Icons.event_available_rounded, '$daysAchieved', l10n.daysAchieved, AppColors.primary, isDark),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _goalStatMini(
+                    Icons.emoji_events_rounded, '${bestDay}${l10n.minShort}', l10n.bestDay, AppColors.warning, isDark),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _goalStatMini(
+                    Icons.calendar_view_week_rounded, '${(weekTotal / 60).toStringAsFixed(1)}${l10n.hourShort}',
+                    l10n.weekTotal, AppColors.success, isDark),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _goalStatMini(
+                    Icons.insights_rounded, '${dailyAvg}${l10n.minDay}', l10n.dailyAverage, AppColors.accent, isDark),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _goalStatMini(
+                    Icons.flag_rounded, goalMinutes > 0 ? '${goalMinutes}min' : '—',
+                    l10n.dailyGoalStat, AppColors.focusColor, isDark),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 150,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxY,
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()}${l10n.minShort}',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= 7) {
+                          return const SizedBox.shrink();
+                        }
+                        final isToday = index == rToday;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            rName[index],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight:
+                                  isToday ? FontWeight.bold : FontWeight.normal,
+                              color: isToday
+                                  ? AppColors.primary
+                                  : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: List.generate(
+                  rData.length,
+                  (i) => BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: rData[i].toDouble(),
+                        width: 18,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4)),
+                        color: goalMinutes > 0 && rData[i] >= goalMinutes
+                            ? AppColors.success
+                            : (i == rToday
+                                ? AppColors.primary
+                                : AppColors.primary.withValues(alpha: 0.35)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _goalStatMini(IconData icon, String value, String label, Color color,
+      bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
           ),
         ],
       ),
@@ -925,7 +1140,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Text('${current}min', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('${current}${l10n.minShort}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 8),
                 if (previous > 0 || current > 0)
                   Container(
@@ -967,7 +1182,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               child: const Icon(Icons.compare_arrows_rounded, color: AppColors.warning, size: 18),
             ),
             const SizedBox(width: 12),
-            Text('Period Comparison', style: TextStyle(
+            Text(l10n.periodComparison, style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : Colors.black87)),
           ],
@@ -975,9 +1190,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: buildCompare('This Week', thisWeek, lastWeek, AppColors.success)),
+            Expanded(child: buildCompare(l10n.thisWeek, thisWeek, lastWeek, AppColors.success)),
             const SizedBox(width: 12),
-            Expanded(child: buildCompare('This Month', thisMonth, lastMonth, AppColors.warning)),
+            Expanded(child: buildCompare(l10n.thisMonth, thisMonth, lastMonth, AppColors.warning)),
           ],
         ),
       ],
@@ -1015,7 +1230,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 child: const Icon(Icons.filter_list_rounded, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 12),
-              Text('Filter by Project', style: TextStyle(
+              Text(l10n.filterByProject, style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87)),
             ],
@@ -1025,7 +1240,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildFilterChip('All', _filterProjectId == null, isDark, () {
+              _buildFilterChip(l10n.all, _filterProjectId == null, isDark, () {
                 setState(() => _filterProjectId = null);
               }),
               ...projects.map((p) {
@@ -1074,13 +1289,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   List<double> _getFilteredDailyMinutesThisWeek() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     final dailyMinutes = List<double>.filled(7, 0);
     for (int i = 0; i < 7; i++) {
       final day = startOfWeek.add(Duration(days: i));
       final daySessions = _filteredSessions(projectId: _filterProjectId, since: day)
           .where((s) => s.date.year == day.year && s.date.month == day.month && s.date.day == day.day);
-      dailyMinutes[i] = daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
+      dailyMinutes[i] = daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
     }
     return dailyMinutes;
   }
@@ -1103,7 +1318,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   int _getFilteredTotalMinutes() {
     return _filteredSessions(projectId: _filterProjectId)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _getFilteredTotalSessions() {
@@ -1113,11 +1328,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   List<Map<String, dynamic>> _getFilteredProjectBreakdown() {
     final sessions = _filteredSessions(projectId: _filterProjectId);
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     final weekSessions = sessions.where((s) => !s.date.isBefore(startOfWeek));
     final map = <String, int>{};
     for (final s in weekSessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
+      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
     }
     final list = <Map<String, dynamic>>[];
     for (final entry in map.entries) {
@@ -1131,7 +1346,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         });
       }
     }
-    list.sort((a, b) => b['minutes'] as int);
+    list.sort((a, b) => (b['minutes'] as int) - (a['minutes'] as int));
     return list;
   }
 
@@ -1144,13 +1359,16 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       var daySessions = DatabaseService.getSessionsForDate(day).where((s) => s.completed);
       if (_filterProjectId != null) daySessions = daySessions.where((s) => s.projectId == _filterProjectId);
       final weekIndex = ((d - 1) ~/ 7).clamp(0, 3);
-      weeklyMinutes[weekIndex] += daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
+      weeklyMinutes[weekIndex] += daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
     }
-    return weeklyMinutes;
+    // RTL: reverse so most recent week (W4) is on the right.
+    return List<double>.from(weeklyMinutes.reversed);
   }
 
   Widget _buildHeatMap(bool isDark) {
-    final data = DatabaseService.getHeatMapData(weeks: 16);
+    final rawData = DatabaseService.getHeatMapData(weeks: 16);
+    // RTL: reverse weeks so most recent is on the right.
+    final data = List<List<int>>.from(rawData.reversed);
     final maxMins = data.expand((w) => w).where((m) => m >= 0).fold(0, (a, b) => a > b ? a : b);
     const cellSize = 14.0;
     const gap = 3.0;
@@ -1189,11 +1407,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 child: const Icon(Icons.grid_view_rounded, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 12),
-              const Text('Activity Heat Map', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(l10n.activityHeatMap, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const Spacer(),
               Row(
                 children: [
-                  Text('Less', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                  Text(l10n.less, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
                   const SizedBox(width: 4),
                   ...List.generate(5, (i) {
                     final opacity = 0.04 + (i / 4) * 0.76;
@@ -1207,7 +1425,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     );
                   }),
                   const SizedBox(width: 4),
-                  Text('More', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                  Text(l10n.more, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
                 ],
               ),
             ],
@@ -1222,7 +1440,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   padding: const EdgeInsets.only(top: 2, right: 4),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: ['Mon', '', 'Wed', '', 'Fri', '', 'Sun'].map((d) {
+                    children: [l10n.sat, '', l10n.mon, '', l10n.wed, '', l10n.fri].map((d) {
                       return SizedBox(
                         height: cellSize,
                         child: Text(d, style: TextStyle(fontSize: 9, color: Colors.grey[500])),
@@ -1268,9 +1486,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildPeriodChip('Week', 'week', isDark),
+        _buildPeriodChip(l10n.weeklyChart, 'week', isDark),
         const SizedBox(width: 8),
-        _buildPeriodChip('Month', 'month', isDark),
+        _buildPeriodChip(l10n.monthlyChart, 'month', isDark),
       ],
     );
   }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pomodoro_app/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 import '../models/project.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../utils/page_transitions.dart';
+import '../widgets/app_ui.dart';
 import '../widgets/project_card.dart';
 import 'project_detail_screen.dart';
 import 'immersive_focus_screen.dart';
@@ -78,8 +81,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     int selectedColor = project?.colorValue ?? AppColors.projectColors[0].toARGB32();
     String selectedIcon = project?.icon ?? '🎯';
     int weeklyGoal = project?.weeklyGoalMinutes ?? 0;
-    int defaultDuration = project?.defaultDuration ?? 25;
+    int dailyGoal = project?.dailyGoalMinutes ?? 0;
+    bool includeInWeekly = project?.includeInWeeklyGoal ?? true;
+    final defaultDuration = project?.defaultDuration ?? 1500;
     String selectedTheme = project?.theme ?? 'default';
+    final durationMinController =
+        TextEditingController(text: '${defaultDuration ~/ 60}');
+    final durationSecController = TextEditingController(
+        text: (defaultDuration % 60).toString().padLeft(2, '0'));
 
     showModalBottomSheet(
       context: context,
@@ -101,18 +110,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               ),
               child: Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40, height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SheetHandleBar(),                  const SizedBox(height: 16),
                   Text(
-                    project != null ? 'Edit Project' : 'New Project',
+                    project != null ? AppLocalizations.of(context).editProject : AppLocalizations.of(context).newProject,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
@@ -124,7 +124,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           TextField(
                             controller: nameController,
                             decoration: InputDecoration(
-                              hintText: 'Project name',
+                              hintText: AppLocalizations.of(context).projectName,
                               filled: true,
                               fillColor: isDark
                                   ? Colors.white.withValues(alpha: 0.05)
@@ -145,7 +145,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           TextField(
                             controller: descController,
                             decoration: InputDecoration(
-                              hintText: 'Description (optional)',
+                              hintText: AppLocalizations.of(context).descriptionOptional,
                               filled: true,
                               fillColor: isDark
                                   ? Colors.white.withValues(alpha: 0.05)
@@ -162,7 +162,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          const Text('Theme', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          Text(AppLocalizations.of(context).theme, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           const SizedBox(height: 10),
                           SizedBox(
                             height: 80,
@@ -210,55 +210,70 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
+                          Text(AppLocalizations.of(context).defaultTimer, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Text('Default Timer', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              const Spacer(),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(10),
+                              Expanded(
+                                child: _buildDurationField(
+                                  controller: durationMinController,
+                                  label: AppLocalizations.of(context).minutes,
+                                  isDark: isDark,
                                 ),
-                                child: Row(
-                                  children: [
-                                    IconButton(
-                                      onPressed: defaultDuration > 5
-                                          ? () => setModalState(() {
-                                                final idx = _durations.indexOf(defaultDuration);
-                                                if (idx > 0) defaultDuration = _durations[idx - 1];
-                                              })
-                                          : null,
-                                      icon: const Icon(Icons.remove, size: 18),
-                                      color: AppColors.primary,
-                                    ),
-                                    Container(
-                                      width: 52,
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        '${defaultDuration}min',
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: defaultDuration < 90
-                                          ? () => setModalState(() {
-                                                final idx = _durations.indexOf(defaultDuration);
-                                                if (idx < _durations.length - 1) defaultDuration = _durations[idx + 1];
-                                              })
-                                          : null,
-                                      icon: const Icon(Icons.add, size: 18),
-                                      color: AppColors.primary,
-                                    ),
-                                  ],
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(':',
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              ),
+                              Expanded(
+                                child: _buildDurationField(
+                                  controller: durationSecController,
+                                  label: AppLocalizations.of(context).seconds,
+                                  isDark: isDark,
                                 ),
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _durations.map((m) {
+                              final isSelected =
+                                  durationMinController.text == '$m' &&
+                                      durationSecController.text == '00';
+                              return GestureDetector(
+                                onTap: () => setModalState(() {
+                                  durationMinController.text = '$m';
+                                  durationSecController.text = '00';
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary.withValues(alpha: 0.15)
+                                        : isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isSelected ? Border.all(color: AppColors.primary, width: 1.5) : null,
+                                  ),
+                                  child: Text(
+                                    '${m}m',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected ? AppColors.primary : null,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                           const SizedBox(height: 14),
-                           const Row(
+                           Row(
                             children: [
-                              Text('Color', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              Spacer(),
+                              Text(AppLocalizations.of(context).color, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              const Spacer(),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -282,7 +297,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             }).toList(),
                           ),
                           const SizedBox(height: 14),
-                          const Text('Icon', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          Text(AppLocalizations.of(context).icon, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           const SizedBox(height: 10),
                           Wrap(
                             spacing: 8, runSpacing: 8,
@@ -306,40 +321,76 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             }).toList(),
                           ),
                           const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              const Text('Weekly Goal', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              const Spacer(),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  children: [
-                                    IconButton(
-                                      onPressed: weeklyGoal > 0
-                                          ? () => setModalState(() => weeklyGoal -= 15)
-                                          : null,
-                                      icon: const Icon(Icons.remove, size: 18), color: AppColors.primary,
-                                    ),
-                                    Container(
-                                      width: 52, alignment: Alignment.center,
-                                      child: Text(
-                                        weeklyGoal > 0 ? '${weeklyGoal}min' : 'Off',
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed: weeklyGoal < 600
-                                          ? () => setModalState(() => weeklyGoal += 15)
-                                          : null,
-                                      icon: const Icon(Icons.add, size: 18), color: AppColors.primary,
-                                    ),
-                                  ],
-                                ),
+                          _GoalEditorCard(
+                            title: AppLocalizations.of(context).weeklyGoalMin,
+                            value: weeklyGoal,
+                            step: 10,
+                            presets: const [60, 120, 300, 450, 600, 900],
+                            accent: AppColors.primary,
+                            isDark: isDark,
+                            onChanged: (v) => setModalState(() => weeklyGoal = v),
+                          ),
+                          const SizedBox(height: 14),
+                          _GoalEditorCard(
+                            title: AppLocalizations.of(context).dailyGoalMin,
+                            value: dailyGoal,
+                            step: 5,
+                            presets: const [15, 30, 45, 60, 90, 120],
+                            accent: AppColors.success,
+                            isDark: isDark,
+                            onChanged: (v) => setModalState(() => dailyGoal = v),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: includeInWeekly
+                                  ? AppColors.success.withValues(alpha: 0.08)
+                                  : isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: includeInWeekly
+                                    ? AppColors.success.withValues(alpha: 0.35)
+                                    : Colors.grey.withValues(alpha: 0.15),
                               ),
-                            ],
+                            ),
+                            child: Row(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: includeInWeekly
+                                        ? AppColors.success
+                                        : Colors.grey.withValues(alpha: 0.3),
+                                  ),
+                                  child: includeInWeekly
+                                      ? const Icon(Icons.check_rounded,
+                                          color: Colors.white, size: 17)
+                                      : null,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    AppLocalizations.of(context).countWeeklyGoalClear,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
+                                      color: includeInWeekly
+                                          ? isDark ? Colors.white : Colors.black87
+                                          : Colors.grey[500],
+                                    ),
+                                  ),
+                                ),
+                                Switch(
+                                  value: includeInWeekly,
+                                  activeThumbColor: AppColors.success,
+                                  onChanged: (v) => setModalState(() => includeInWeekly = v),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 20),
                         ],
@@ -352,13 +403,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       onPressed: () {
                         final name = nameController.text.trim();
                         if (name.isEmpty) return;
+                        final mins = int.tryParse(durationMinController.text) ?? 0;
+                        final secs = int.tryParse(durationSecController.text) ?? 0;
+                        final totalSeconds = (mins.clamp(0, 120)) * 60 + (secs.clamp(0, 59));
                         if (project != null) {
                           project.name = name;
                           project.description = descController.text.trim();
                           project.colorValue = selectedColor;
                           project.icon = selectedIcon;
                           project.weeklyGoalMinutes = weeklyGoal;
-                          project.defaultDuration = defaultDuration;
+                          project.dailyGoalMinutes = dailyGoal;
+                          project.includeInWeeklyGoal = includeInWeekly;
+                          project.defaultDuration = totalSeconds;
                           project.theme = selectedTheme;
                           project.save();
                         } else {
@@ -369,7 +425,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             icon: selectedIcon,
                             description: descController.text.trim(),
                             weeklyGoalMinutes: weeklyGoal,
-                            defaultDuration: defaultDuration,
+                            dailyGoalMinutes: dailyGoal,
+                            includeInWeeklyGoal: includeInWeekly,
+                            defaultDuration: totalSeconds,
                             theme: selectedTheme,
                           ));
                         }
@@ -383,7 +441,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: Text(
-                        project != null ? 'Update' : 'Create',
+                        project != null ? AppLocalizations.of(context).update : AppLocalizations.of(context).create,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -395,6 +453,37 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildDurationField({
+    required TextEditingController controller,
+    required String label,
+    required bool isDark,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.grey.withValues(alpha: 0.08),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      ),
     );
   }
 
@@ -414,14 +503,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Center(
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
-                ),
+                const SheetHandleBar(),
                 const SizedBox(height: 8),
                 ListTile(
                   leading: const Icon(Icons.play_circle_fill_rounded, color: AppColors.success, size: 24),
-                  title: const Text('Quick Start', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('${project.defaultDuration}min focus session'),
+                  title: Text(AppLocalizations.of(context).quickStart, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('${project.defaultDuration ~/ 60}:${(project.defaultDuration % 60).toString().padLeft(2, '0')} ${AppLocalizations.of(context).focusSession}'),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   onTap: () {
                     Navigator.pop(context);
@@ -433,7 +520,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.info_outline_rounded, size: 22),
-                  title: const Text('View Details'),
+                  title: Text(AppLocalizations.of(context).viewDetails),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   onTap: () {
                     Navigator.pop(context);
@@ -445,7 +532,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.edit_rounded, size: 22),
-                  title: const Text('Edit'),
+                  title: Text(AppLocalizations.of(context).edit),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   onTap: () {
                     Navigator.pop(context);
@@ -454,7 +541,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.archive_rounded, size: 22),
-                  title: Text(project.isArchived ? 'Unarchive' : 'Archive'),
+                  title: Text(project.isArchived ? AppLocalizations.of(context).unarchive : AppLocalizations.of(context).archive),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   onTap: () {
                     if (project.isArchived) {
@@ -469,8 +556,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error, size: 22),
-                  title: const Text('Delete Completely', style: TextStyle(color: AppColors.error)),
-                  subtitle: const Text('Project + all sessions', style: TextStyle(fontSize: 11)),
+                  title: Text(AppLocalizations.of(context).deleteCompletely, style: const TextStyle(color: AppColors.error)),
+                  subtitle: Text(AppLocalizations.of(context).projectAndSessions, style: const TextStyle(fontSize: 11)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   onTap: () {
                     Navigator.pop(context);
@@ -487,20 +574,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _confirmDelete(Project project) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sessions = DatabaseService.getSessionsForProject(project.id);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Project'),
-        content: Text(
-          'Delete "${project.name}" and ${sessions.length} session${sessions.length != 1 ? 's' : ''}?\n\nThis cannot be undone.',
-        ),
+        title: Text(AppLocalizations.of(context).deleteProject),
+        content: Text(AppLocalizations.of(context).deleteConfirmMsg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -509,7 +593,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               _loadProjects();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${project.name} deleted'),
+                  content: Text('${project.name} ${AppLocalizations.of(context).projectDeleted}'),
                   backgroundColor: AppColors.error,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -517,7 +601,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               );
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context).delete),
           ),
         ],
       ),
@@ -526,25 +610,22 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Future<bool?> _confirmDeleteSwipe(Project project) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sessions = DatabaseService.getSessionsForProject(project.id);
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Project'),
-        content: Text(
-          'Delete "${project.name}" and ${sessions.length} session${sessions.length != 1 ? 's' : ''}?\n\nThis cannot be undone.',
-        ),
+        title: Text(AppLocalizations.of(context).deleteProject),
+        content: Text(AppLocalizations.of(context).deleteConfirmMsg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context).delete),
           ),
         ],
       ),
@@ -554,7 +635,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _loadProjects();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${project.name} deleted'),
+            content: Text('${project.name} ${AppLocalizations.of(context).projectDeleted}'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -581,7 +662,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 children: [
                            Row(
                             children: [
-                      Text('Projects', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+                      Text(AppLocalizations.of(context).projects, style: Theme.of(context).textTheme.displaySmall),
                       const Spacer(),
                       Container(
                         decoration: BoxDecoration(
@@ -605,7 +686,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       controller: _searchController,
                       onChanged: (v) => setState(() { _searchQuery = v; _applyFilter(); }),
                       decoration: InputDecoration(
-                        hintText: 'Search projects...',
+                        hintText: AppLocalizations.of(context).searchProjects,
                         prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 22),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(onPressed: () { _searchController.clear(); setState(() { _searchQuery = ''; _applyFilter(); }); }, icon: Icon(Icons.clear, color: Colors.grey[400], size: 18))
@@ -628,9 +709,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         children: [
                           Container(width: 80, height: 80, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), shape: BoxShape.circle), child: Icon(Icons.folder_open_rounded, size: 40, color: AppColors.primary.withValues(alpha: 0.4))),
                           const SizedBox(height: 16),
-                          Text(_showArchived ? 'No archived projects' : _searchQuery.isNotEmpty ? 'No matching projects' : 'No projects yet', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: isDark ? Colors.grey[400] : Colors.grey[600])),
+                          Text(_showArchived ? AppLocalizations.of(context).noArchivedProjects : _searchQuery.isNotEmpty ? AppLocalizations.of(context).noMatchingProjects : AppLocalizations.of(context).noProjectsYet, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: isDark ? Colors.grey[400] : Colors.grey[600])),
                           const SizedBox(height: 6),
-                          Text(_showArchived ? '' : _searchQuery.isNotEmpty ? 'Try a different search' : 'Create a project to start tracking', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                          Text(_showArchived ? '' : _searchQuery.isNotEmpty ? 'Try a different search' : AppLocalizations.of(context).createProjectToStart, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                         ],
                       ),
                     )
@@ -688,7 +769,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           foregroundColor: Colors.white,
           elevation: 4,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('New Project', style: TextStyle(fontWeight: FontWeight.w600)),
+          label: Text(AppLocalizations.of(context).newProject, style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
       ),
     );
@@ -705,11 +786,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem('$_activeProjects', 'Projects', AppColors.primary),
+          _buildSummaryItem('$_activeProjects', AppLocalizations.of(context).projects, AppColors.primary),
           Container(height: 24, width: 1, color: AppColors.primary.withValues(alpha: 0.15)),
-          _buildSummaryItem('${_totalHours.toStringAsFixed(1)}h', 'Total', AppColors.success),
+          _buildSummaryItem('${_totalHours.toStringAsFixed(1)}h', AppLocalizations.of(context).total, AppColors.success),
           Container(height: 24, width: 1, color: AppColors.primary.withValues(alpha: 0.15)),
-          _buildSummaryItem('$_totalSessions', 'Sessions', AppColors.warning),
+          _buildSummaryItem('$_totalSessions', AppLocalizations.of(context).sessionsCount, AppColors.warning),
         ],
       ),
     );
@@ -721,6 +802,229 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
         Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
       ],
+    );
+  }
+}
+
+/// Modern goal editor card used inside the New/Edit Project sheet.
+/// Big animated value, +/− step chips, quick presets, live derived hint.
+class _GoalEditorCard extends StatelessWidget {
+  final String title;
+  final int value;
+  final int step;
+  final List<int> presets;
+  final Color accent;
+  final bool isDark;
+  final ValueChanged<int> onChanged;
+
+  const _GoalEditorCard({
+    required this.title,
+    required this.value,
+    required this.step,
+    required this.presets,
+    required this.accent,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  void _bump(int delta) {
+    final next = (value + delta).clamp(0, 100000);
+    if (next != value) onChanged(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: accent)),
+          const SizedBox(height: 10),
+
+          // Value row: − [big number] +
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _StepBtn(
+                icon: Icons.remove_rounded,
+                accent: accent,
+                enabled: value > 0,
+                onTap: () => _bump(-step),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      switchInCurve: Curves.easeOutCubic,
+                      transitionBuilder: (child, anim) {
+                        final isIn = child.key == ValueKey(value);
+                        return FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: isIn
+                                  ? const Offset(0, 0.3)
+                                  : const Offset(0, -0.3),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Row(
+                        key: ValueKey(value),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$value',
+                            style: TextStyle(
+                              fontSize: 40,
+                              height: 1.05,
+                              fontWeight: FontWeight.w800,
+                              color: value > 0
+                                  ? accent
+                                  : Colors.grey[400],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            l10n.unitMinutesWord,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          if (title == AppLocalizations.of(context).dailyGoalMin)
+                            Text(
+                              ' (${l10n.dailySuffix})',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Derived weekly->daily hint only on the weekly card.
+                    if (title == AppLocalizations.of(context).weeklyGoalMin &&
+                        value >= 7)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          l10n.weeklyPerDayHint
+                              .replaceAll('{n}', '$value')
+                              .replaceAll('{d}',
+                                  '${(value / 7).floor()}'),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _StepBtn(
+                icon: Icons.add_rounded,
+                accent: accent,
+                enabled: true,
+                onTap: () => _bump(step),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Presets.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: presets.map((p) {
+              final active = p == value;
+              return GestureDetector(
+                onTap: () => onChanged(p),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: active ? accent : accent.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color:
+                          active ? accent : accent.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    '$p ${l10n.unitMinuteShort}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: active ? Colors.white : accent,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepBtn extends StatelessWidget {
+  final IconData icon;
+  final Color accent;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _StepBtn({
+    required this.icon,
+    required this.accent,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: enabled ? accent.withValues(alpha: 0.1) : Colors.transparent,
+          border: Border.all(
+            color: enabled
+                ? accent.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Icon(icon,
+            size: 22,
+            color: enabled ? accent : Colors.grey[400]),
+      ),
     );
   }
 }

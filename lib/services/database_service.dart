@@ -4,36 +4,89 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/project.dart';
 import '../models/session.dart';
 import '../models/task.dart';
+import '../models/day_goal.dart';
+import '../models/stage_item.dart';
 import '../utils/constants.dart';
+import '../utils/productivity_quotes.dart';
 
 class DatabaseService {
   static const String _projectsBox = 'projects';
   static const String _sessionsBox = 'sessions';
   static const String _tasksBox = 'tasks';
   static const String _settingsBox = 'settings';
+  static const String _dayGoalsBox = 'dayGoals';
+  static const String _customQuotesBox = 'customQuotes';
 
   static late Box<Project> _projects;
   static late Box<Session> _sessions;
   static late Box<Task> _tasks;
   static late Box _settings;
+  static late Box<DayGoal> _dayGoals;
+  static late Box _customQuotes;
 
   static final ValueNotifier<bool> darkModeNotifier = ValueNotifier(false);
   static final ValueNotifier<double> zoomNotifier = ValueNotifier(1.0);
+  static final ValueNotifier<int> goalsRevision = ValueNotifier(0);
+  static final ValueNotifier<Locale> localeNotifier = ValueNotifier(const Locale('ar'));
 
-  static Future<void> init() async {
-    await Hive.initFlutter();
+  static Future<void> init({String? hivePath}) async {
+    if (hivePath != null) {
+      Hive.init(hivePath);
+    } else {
+      await Hive.initFlutter();
+    }
 
     Hive.registerAdapter(ProjectAdapter());
     Hive.registerAdapter(SessionAdapter());
     Hive.registerAdapter(TaskAdapter());
+    Hive.registerAdapter(DayGoalAdapter());
+    Hive.registerAdapter(StageItemAdapter());
 
     _projects = await Hive.openBox<Project>(_projectsBox);
     _sessions = await Hive.openBox<Session>(_sessionsBox);
     _tasks = await Hive.openBox<Task>(_tasksBox);
     _settings = await Hive.openBox(_settingsBox);
+    _dayGoals = await Hive.openBox<DayGoal>(_dayGoalsBox);
+    _customQuotes = await Hive.openBox(_customQuotesBox);
+
+    await _migrateDurationsToSeconds();
+    await _migrateProjectDurationsToSeconds();
+    await _migrateSoundSettings();
 
     darkModeNotifier.value = darkMode;
     zoomNotifier.value = appZoom;
+    final langCode = getSetting('language', defaultValue: 'ar');
+    localeNotifier.value = Locale(langCode is String ? langCode : 'ar');
+  }
+
+  static Future<void> _migrateDurationsToSeconds() async {
+    if (getSetting('durationsInSeconds', defaultValue: false) == true) return;
+    final focus = getSetting('focusDuration');
+    final short = getSetting('shortBreakDuration');
+    final long = getSetting('longBreakDuration');
+    if (focus is int) {
+      await _settings.put('focusDuration', focus * 60);
+    }
+    if (short is int) {
+      await _settings.put('shortBreakDuration', short * 60);
+    }
+    if (long is int) {
+      await _settings.put('longBreakDuration', long * 60);
+    }
+    await _settings.put('durationsInSeconds', true);
+  }
+
+  static Future<void> _migrateProjectDurationsToSeconds() async {
+    if (getSetting('projectDurationsInSeconds', defaultValue: false) == true) {
+      return;
+    }
+    for (final project in _projects.values) {
+      if (project.defaultDuration <= 120) {
+        project.defaultDuration = project.defaultDuration * 60;
+        await project.save();
+      }
+    }
+    await _settings.put('projectDurationsInSeconds', true);
   }
 
   // Projects
@@ -106,7 +159,7 @@ class DatabaseService {
 
   static List<Session> getSessionsForWeek() {
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     return _sessions.values.where((s) {
       return !s.date.isBefore(startOfWeek);
     }).toList();
@@ -125,9 +178,10 @@ class DatabaseService {
     final project = _projects.get(session.projectId);
     if (project != null && session.completed) {
       project.totalSessions++;
-      project.totalMinutes += session.durationMinutes;
+      project.totalMinutes += (session.actualMinutes ?? session.durationMinutes);
       await project.save();
     }
+    goalsRevision.value++;
   }
 
   static Future<void> deleteSession(String id) async {
@@ -136,66 +190,164 @@ class DatabaseService {
       final project = _projects.get(session.projectId);
       if (project != null && session.completed) {
         project.totalSessions--;
-        project.totalMinutes -= session.durationMinutes;
+        project.totalMinutes -= (session.actualMinutes ?? session.durationMinutes);
         await project.save();
       }
       await _sessions.delete(id);
     }
   }
 
+  // Day Goals
+  static String dateKeyOf(DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
+  }
+
+  static DayGoal? getDayGoal(String dateKey) => _dayGoals.get(dateKey);
+
+  static DayGoal getOrCreateDayGoal(String dateKey) {
+    return _dayGoals.get(dateKey) ??
+        DayGoal(dateKey: dateKey, goalMinutes: 0);
+  }
+
+  static Future<void> saveDayGoal(DayGoal goal) async {
+    await _dayGoals.put(goal.dateKey, goal);
+    goalsRevision.value++;
+  }
+
+  static Future<void> deleteDayGoal(String dateKey) async {
+    await _dayGoals.delete(dateKey);
+    goalsRevision.value++;
+  }
+
+  /// Timer-minute predicate: tasbeeh sessions carry repetitions, not
+  /// focus minutes, so they are excluded from every minute/streak
+  /// aggregate while remaining fully visible in history & timelines.
+  static bool _isTimerSession(Session s) =>
+      s.completed && s.sessionType != 'tasbeeh';
+
+  /// Sum of today's tasbeeh repetitions (repetitions, not minutes).
+  static int getTasbeehCountForDay(DateTime date) {
+    return _sessions.values
+        .where((s) =>
+            s.completed &&
+            s.sessionType == 'tasbeeh' &&
+            s.date.year == date.year &&
+            s.date.month == date.month &&
+            s.date.day == date.day)
+        .fold(0, (sum, s) => sum + (s.count ?? 0));
+  }
+
+  /// All-time tasbeeh repetitions.
+  static int getTasbeehTotalCount() {
+    return _sessions.values
+        .where((s) => s.completed && s.sessionType == 'tasbeeh')
+        .fold(0, (sum, s) => sum + (s.count ?? 0));
+  }
+
+  static int getCompletedMinutesForDay(DateTime date,
+      {bool onlyInWeeklyGoal = false}) {
+    final sessions = getSessionsForDate(date).where(_isTimerSession);
+    int total = 0;
+    for (final s in sessions) {
+      if (onlyInWeeklyGoal) {
+        final project = _projects.get(s.projectId);
+        if (project == null || !project.includeInWeeklyGoal) continue;
+      }
+      total += (s.actualMinutes ?? s.durationMinutes);
+    }
+    return total;
+  }
+
+  static int getCompletedMinutesForWeek({bool onlyInWeeklyGoal = false}) {
+    final sessions = getSessionsForWeek().where(_isTimerSession);
+    int total = 0;
+    for (final s in sessions) {
+      if (onlyInWeeklyGoal) {
+        final project = _projects.get(s.projectId);
+        if (project == null || !project.includeInWeeklyGoal) continue;
+      }
+      total += (s.actualMinutes ?? s.durationMinutes);
+    }
+    return total;
+  }
+
+  static List<int> getDailyCompletedMinutesThisWeek({bool onlyInWeeklyGoal = false}) {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
+    final list = <int>[];
+    for (int i = 0; i < 7; i++) {
+      final day = startOfWeek.add(Duration(days: i));
+      list.add(getCompletedMinutesForDay(day, onlyInWeeklyGoal: onlyInWeeklyGoal));
+    }
+    return list;
+  }
+
+  static Future<void> setDailyGoalMinutes(int minutes) async {
+    await setSetting('dailyGoalMinutes', minutes);
+    goalsRevision.value++;
+  }
+
+  static Future<void> setWeeklyGoalMinutes(int minutes) async {
+    await setSetting('weeklyGoalMinutes', minutes);
+    goalsRevision.value++;
+  }
+
   // Statistics
   static int getTodayMinutes() {
     final sessions = getSessionsForDate(DateTime.now());
     return sessions
-        .where((s) => s.completed)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where(_isTimerSession)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getWeekMinutes() {
     final sessions = getSessionsForWeek();
     return sessions
-        .where((s) => s.completed)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where(_isTimerSession)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getMonthMinutes() {
     final sessions = getSessionsForMonth();
     return sessions
-        .where((s) => s.completed)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where(_isTimerSession)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getTodaySessions() {
     return getSessionsForDate(DateTime.now())
-        .where((s) => s.completed)
+        .where(_isTimerSession)
         .length;
   }
 
   static int getWeekSessions() {
     return getSessionsForWeek()
-        .where((s) => s.completed)
+        .where(_isTimerSession)
         .length;
   }
 
   static Map<String, int> getProjectMinutesThisWeek() {
-    final sessions = getSessionsForWeek().where((s) => s.completed);
+    final sessions = getSessionsForWeek().where(_isTimerSession);
     final map = <String, int>{};
     for (final s in sessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
+      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
     }
     return map;
   }
 
   static List<double> getDailyMinutesThisWeek() {
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
     final dailyMinutes = List<double>.filled(7, 0);
 
     for (int i = 0; i < 7; i++) {
       final day = startOfWeek.add(Duration(days: i));
-      final daySessions = getSessionsForDate(day).where((s) => s.completed);
+      final daySessions = getSessionsForDate(day).where(_isTimerSession);
       dailyMinutes[i] =
-          daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
+          daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
     }
     return dailyMinutes;
   }
@@ -208,27 +360,27 @@ class DatabaseService {
   }
 
   static double getAverageSessionDuration() {
-    final sessions = _sessions.values.where((s) => s.completed).toList();
+    final sessions = _sessions.values.where(_isTimerSession).toList();
     if (sessions.isEmpty) return 0;
-    final total = sessions.fold(0, (sum, s) => sum + s.durationMinutes);
+    final total = sessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
     return total / sessions.length;
   }
 
   static int getProjectTodayMinutes(String projectId) {
     return getSessionsForDate(DateTime.now())
-        .where((s) => s.completed && s.projectId == projectId)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where((s) => _isTimerSession(s) && s.projectId == projectId)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getProjectWeekMinutes(String projectId) {
     return getSessionsForWeek()
-        .where((s) => s.completed && s.projectId == projectId)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where((s) => _isTimerSession(s) && s.projectId == projectId)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getProjectWeekSessions(String projectId) {
     return getSessionsForWeek()
-        .where((s) => s.completed && s.projectId == projectId)
+        .where((s) => _isTimerSession(s) && s.projectId == projectId)
         .length;
   }
 
@@ -238,7 +390,7 @@ class DatabaseService {
     for (int i = 0; i < 365; i++) {
       final day = now.subtract(Duration(days: i));
       final daySessions = getSessionsForDate(day)
-          .where((s) => s.completed && s.projectId == projectId);
+          .where((s) => _isTimerSession(s) && s.projectId == projectId);
       if (daySessions.isNotEmpty) {
         streak++;
       } else if (i > 0) {
@@ -250,14 +402,14 @@ class DatabaseService {
 
   static List<double> getProjectDailyMinutesThisWeek(String projectId) {
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
     final dailyMinutes = List<double>.filled(7, 0);
     for (int i = 0; i < 7; i++) {
       final day = startOfWeek.add(Duration(days: i));
       final daySessions = getSessionsForDate(day)
-          .where((s) => s.completed && s.projectId == projectId);
+          .where((s) => _isTimerSession(s) && s.projectId == projectId);
       dailyMinutes[i] =
-          daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
+          daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
     }
     return dailyMinutes;
   }
@@ -272,10 +424,10 @@ class DatabaseService {
   }
 
   static List<Map<String, dynamic>> getProjectBreakdown() {
-    final sessions = getSessionsForWeek().where((s) => s.completed);
+    final sessions = getSessionsForWeek().where(_isTimerSession);
     final map = <String, int>{};
     for (final s in sessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
+      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
     }
     final list = <Map<String, dynamic>>[];
     for (final entry in map.entries) {
@@ -289,7 +441,7 @@ class DatabaseService {
         });
       }
     }
-    list.sort((a, b) => b['minutes'] as int);
+    list.sort((a, b) => (b['minutes'] as int) - (a['minutes'] as int));
     return list;
   }
 
@@ -299,7 +451,7 @@ class DatabaseService {
     for (int i = 0; i < 365; i++) {
       final day = now.subtract(Duration(days: i));
       final daySessions =
-          getSessionsForDate(day).where((s) => s.completed);
+          getSessionsForDate(day).where(_isTimerSession);
       if (daySessions.isNotEmpty) {
         streak++;
       } else if (i > 0) {
@@ -311,12 +463,12 @@ class DatabaseService {
 
   static int getTotalAllTimeMinutes() {
     return _sessions.values
-        .where((s) => s.completed)
-        .fold(0, (sum, s) => sum + s.durationMinutes);
+        .where(_isTimerSession)
+        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   static int getTotalAllTimeSessions() {
-    return _sessions.values.where((s) => s.completed).length;
+    return _sessions.values.where(_isTimerSession).length;
   }
 
   static List<Session> getRecentSessions({int limit = 50}) {
@@ -328,7 +480,7 @@ class DatabaseService {
   static List<List<int>> getHeatMapData({int weeks = 16}) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final startDay = today.subtract(Duration(days: today.weekday - 1 + (weeks - 1) * 7));
+    final startDay = today.subtract(Duration(days: (today.weekday + 1) % 7 + (weeks - 1) * 7));
     final data = <List<int>>[];
     for (int w = 0; w < weeks; w++) {
       final week = <int>[];
@@ -338,8 +490,8 @@ class DatabaseService {
           week.add(-1);
         } else {
           final mins = getSessionsForDate(day)
-              .where((s) => s.completed)
-              .fold(0, (sum, s) => sum + s.durationMinutes);
+              .where(_isTimerSession)
+              .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
           week.add(mins);
         }
       }
@@ -422,24 +574,84 @@ class DatabaseService {
     return _settings.get(key, defaultValue: defaultValue);
   }
 
-  static int get focusDuration => getSetting('focusDuration', defaultValue: 25);
+  static int get focusDuration => getSetting('focusDuration', defaultValue: 1500);
   static int get shortBreakDuration =>
-      getSetting('shortBreakDuration', defaultValue: 5);
+      getSetting('shortBreakDuration', defaultValue: 300);
   static int get longBreakDuration =>
-      getSetting('longBreakDuration', defaultValue: 15);
+      getSetting('longBreakDuration', defaultValue: 900);
   static bool get darkMode => getSetting('darkMode', defaultValue: false);
   static bool get autoStartBreaks =>
       getSetting('autoStartBreaks', defaultValue: true);
   static bool get autoStartPomodoros =>
       getSetting('autoStartPomodoros', defaultValue: false);
-  static bool get soundEnabled =>
-      getSetting('soundEnabled', defaultValue: true);
-  static int get dailyGoal => getSetting('dailyGoal', defaultValue: AppConstants.dailyGoalDefault);
-  static double get appZoom => getSetting('appZoom', defaultValue: 1.0);
-  static int get longBreakInterval => getSetting('longBreakInterval', defaultValue: 4);
-  static bool get tickSoundEnabled => getSetting('tickSoundEnabled', defaultValue: true);
+  static bool get completionSoundEnabled =>
+      getSetting('completionSoundEnabled', defaultValue: true);
+  static String get completionSoundType =>
+      getSetting('completionSoundType', defaultValue: 'wind_chime');
+  static bool get countdownSoundEnabled =>
+      getSetting('countdownSoundEnabled', defaultValue: true);
+  static String get countdownSoundType =>
+      getSetting('countdownSoundType', defaultValue: 'water_drops');
+  static int get countdownSeconds =>
+      getSetting('countdownSeconds', defaultValue: 10);
   static double get ambientVolume => getSetting('ambientVolume', defaultValue: 0.4);
-  static int get startOfWeek => getSetting('startOfWeek', defaultValue: 1); // 1=Monday, 7=Sunday
+
+  static Future<void> _migrateSoundSettings() async {
+    if (getSetting('soundSettingsMigrated', defaultValue: false) == true) return;
+
+    final oldTickEnabled = getSetting('tickSoundEnabled', defaultValue: true);
+    final oldSoundEnabled = getSetting('soundEnabled', defaultValue: true);
+    final oldCompletionSound = getSetting('completionSound', defaultValue: 'soft_bell');
+
+    await _settings.put('completionSoundEnabled', oldSoundEnabled);
+    await _settings.put('completionSoundType', oldCompletionSound);
+    await _settings.put('countdownSoundEnabled', oldTickEnabled);
+    await _settings.put('countdownSoundType', 'water_drops');
+    await _settings.put('countdownSeconds', 10);
+
+    await _settings.delete('soundEnabled');
+    await _settings.delete('tickSoundEnabled');
+    await _settings.delete('completionSound');
+    await _settings.put('soundSettingsMigrated', true);
+  }
+
+  static int get dailyGoal => getSetting('dailyGoal', defaultValue: AppConstants.dailyGoalDefault);
+  static int get dailyGoalMinutes => getSetting('dailyGoalMinutes', defaultValue: 0);
+  static int get weeklyGoalMinutes => getSetting('weeklyGoalMinutes', defaultValue: 0);
+
+  /// Single source of truth for the daily target in minutes.
+  /// Prefers the minutes-based setting; falls back to legacy hours-based.
+  static int get dailyTargetMinutes {
+    final m = dailyGoalMinutes;
+    if (m > 0) return m;
+    return dailyGoal * 60;
+  }
+  static double get appZoom => getSetting('appZoom', defaultValue: 1.0);
+  static int get longBreakInterval {
+    final v = getSetting('longBreakInterval', defaultValue: 4);
+    // Guard against corrupted/restored values of 0 or 1, which would crash
+    // the `% interval` calls in TimerService.
+    return v is int && v >= 2 ? v : 4;
+  }
+
+  static bool get completionVibrationEnabled =>
+      getSetting('completionVibrationEnabled', defaultValue: true);
+
+  // ------- Quote favorites -------
+  static Set<String> get favoriteQuotes {
+    final raw = (getSetting('favoriteQuotes', defaultValue: '') as String?) ?? '';
+    return raw.split(',').where((s) => s.isNotEmpty).toSet();
+  }
+
+  static Future<void> toggleFavoriteQuote(String id) async {
+    final favs = favoriteQuotes;
+    if (!favs.add(id)) favs.remove(id);
+    await setSetting('favoriteQuotes', favs.join(','));
+    quoteFavoritesNotifier.value = favs;
+  }
+
+  static final ValueNotifier<Set<String>> quoteFavoritesNotifier =
+      ValueNotifier(favoriteQuotes);
 
   static Future<void> deleteAllData() async {
     await _sessions.clear();
@@ -465,6 +677,10 @@ class DatabaseService {
         'rating': v.rating,
         'notes': v.notes,
         'taskId': v.taskId,
+        'actualMinutes': v.actualMinutes,
+        'actualSeconds': v.actualSeconds,
+        'startTime': v.startTime?.toIso8601String(),
+        'endTime': v.endTime?.toIso8601String(),
       })),
       'tasks': _tasks.toMap().map((k, v) => MapEntry(k, {
         'id': v.id,
@@ -505,6 +721,11 @@ class DatabaseService {
         rating: s['rating'],
         notes: s['notes'],
         taskId: s['taskId'],
+        actualMinutes: s['actualMinutes'],
+        actualSeconds: s['actualSeconds'],
+        startTime:
+            s['startTime'] != null ? DateTime.parse(s['startTime']) : null,
+        endTime: s['endTime'] != null ? DateTime.parse(s['endTime']) : null,
       ));
       count++;
     }
@@ -536,5 +757,130 @@ class DatabaseService {
     zoomNotifier.value = appZoom;
 
     return count;
+  }
+
+  // ─── Custom Quotes CRUD ───
+  static final ValueNotifier<int> customQuotesRevision = ValueNotifier(0);
+
+  static List<Map<String, String>> getCustomQuotes() {
+    final list = <Map<String, String>>[];
+    for (final key in _customQuotes.keys) {
+      final raw = _customQuotes.get(key);
+      if (raw is Map) {
+        final q = <String, String>{};
+        raw.forEach((k, v) => q[k.toString()] = v.toString());
+        if (q.containsKey('ar') && q['ar']!.isNotEmpty) {
+          list.add(q);
+        }
+      }
+    }
+    return list;
+  }
+
+  /// Returns a set of built-in quote IDs that the user has hidden/deleted.
+  static Set<String> getHiddenQuoteIds() {
+    final raw = getSetting('hiddenQuoteIds', defaultValue: <String>[]);
+    if (raw is List) return raw.map((e) => e.toString()).toSet();
+    return {};
+  }
+
+  static Future<void> hideQuote(String id) async {
+    final hidden = getHiddenQuoteIds();
+    hidden.add(id);
+    await setSetting('hiddenQuoteIds', hidden.toList());
+    customQuotesRevision.value++;
+  }
+
+  static Future<void> unhideQuote(String id) async {
+    final hidden = getHiddenQuoteIds();
+    hidden.remove(id);
+    await setSetting('hiddenQuoteIds', hidden.toList());
+    customQuotesRevision.value++;
+  }
+
+  static Future<void> addCustomQuote({
+    required String ar,
+    required String en,
+    required String cat,
+    String author = '',
+  }) async {
+    final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+    await _customQuotes.put(id, {
+      'id': id,
+      'ar': ar,
+      'en': en,
+      'cat': cat,
+      'author': author,
+    });
+    customQuotesRevision.value++;
+  }
+
+  /// Save/override a quote (works for both built-in and custom).
+  static Future<void> saveQuote({
+    required String id,
+    required String ar,
+    required String en,
+    required String cat,
+    String author = '',
+  }) async {
+    await _customQuotes.put(id, {
+      'id': id,
+      'ar': ar,
+      'en': en,
+      'cat': cat,
+      'author': author,
+    });
+    customQuotesRevision.value++;
+  }
+
+  static Future<void> updateCustomQuote({
+    required String id,
+    required String ar,
+    required String en,
+    required String cat,
+    String author = '',
+  }) async {
+    await _customQuotes.put(id, {
+      'id': id,
+      'ar': ar,
+      'en': en,
+      'cat': cat,
+      'author': author,
+    });
+    customQuotesRevision.value++;
+  }
+
+  static Future<void> deleteCustomQuote(String id) async {
+    await _customQuotes.delete(id);
+    customQuotesRevision.value++;
+  }
+
+  /// Merged quote list: custom overrides built-in by ID, hidden ones removed.
+  static List<Map<String, String>> getMergedQuotes({
+    String? category,
+  }) {
+    final custom = getCustomQuotes();
+    final customMap = {for (final q in custom) q['id']!: q};
+    final hidden = getHiddenQuoteIds();
+
+    final result = <Map<String, String>>[];
+    for (final q in ProductivityQuotes.all) {
+      if (hidden.contains(q['id'])) continue;
+      if (customMap.containsKey(q['id'])) {
+        result.add(customMap[q['id']]!);
+      } else {
+        result.add(q);
+      }
+    }
+    // Add any truly new custom quotes (not overrides).
+    for (final q in custom) {
+      if (!ProductivityQuotes.all.any((b) => b['id'] == q['id'])) {
+        result.add(q);
+      }
+    }
+    if (category != null && category != 'all') {
+      return result.where((q) => q['cat'] == category).toList();
+    }
+    return result;
   }
 }

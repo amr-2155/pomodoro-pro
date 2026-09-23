@@ -3,6 +3,8 @@ import '../models/session.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import '../l10n/app_localizations.dart';
+import '../utils/number_formatter.dart';
 
 class SessionHistoryScreen extends StatefulWidget {
   const SessionHistoryScreen({super.key});
@@ -30,7 +32,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
           s.date.month == now.month &&
           s.date.day == now.day).toList();
     } else if (_filter == 'week') {
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
       all = all.where((s) => s.date.isAfter(startOfWeek.subtract(const Duration(days: 1)))).toList();
     } else if (_filter == 'month') {
       all = all.where((s) => s.date.year == now.year && s.date.month == now.month).toList();
@@ -64,7 +66,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Session History',
+                    AppLocalizations.of(context).sessionHistory,
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -73,7 +75,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    '${_sessions.length} sessions',
+                    '${_sessions.length} ${AppLocalizations.of(context).sessionsCount}',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[500],
@@ -86,13 +88,13 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  _buildFilterChip('All', 'all'),
+                  _buildFilterChip(AppLocalizations.of(context).all, 'all'),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Today', 'today'),
+                  _buildFilterChip(AppLocalizations.of(context).today, 'today'),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Week', 'week'),
+                  _buildFilterChip(AppLocalizations.of(context).weeklyChart, 'week'),
                   const SizedBox(width: 8),
-                  _buildFilterChip('Month', 'month'),
+                  _buildFilterChip(AppLocalizations.of(context).monthlyChart, 'month'),
                 ],
               ),
             ),
@@ -201,7 +203,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    project?.icon ?? '🎯',
+                    project?.icon ?? '≡ا»',
                     style: const TextStyle(fontSize: 18),
                   ),
                 ),
@@ -212,7 +214,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      project?.name ?? 'Unknown Project',
+                      project?.name ?? AppLocalizations.of(context).noProject,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -220,8 +222,20 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
+                    if (session.sessionType == 'tasbeeh' &&
+                        (session.count ?? 0) > 0) ...[
+                      Text(
+                        '${AppLocalizations.of(context).tasbeehType} • ${session.count} ${AppLocalizations.of(context).timesWord}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
-                      '${formatDate(session.date)} · ${formatTime(session.date)}',
+                      '${formatDate(session.date)} • ${formatTime(session.date)}',
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
@@ -239,7 +253,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      '${session.durationMinutes}min',
+                      '${fmtMin(session.actualMinutes ?? session.durationMinutes)}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

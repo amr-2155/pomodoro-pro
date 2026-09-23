@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Timer circle body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 C38.5,30 26,42.5 26,58 C26,73.5 38.5,86 54,86 C69.5,86 82,73.5 82,58 C82,42.5 69.5,30 54,30z"/>
+
+    <!-- Inner circle (clock face) -->
+    <path
+        android:fillColor="#F5F5FF"
+        android:pathData="M54,36 C41.8,36 32,45.8 32,58 C32,70.2 41.8,80 54,80 C66.2,80 76,70.2 76,58 C76,45.8 66.2,36 54,36z"/>
+
+    <!-- Timer tick marks (12 positions) -->
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.8" android:pathData="M54,36 L54,40"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.8" android:pathData="M54,76 L54,80"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.8" android:pathData="M34,58 L38,58"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.8" android:pathData="M70,58 L74,58"/>
+
+    <!-- Short tick marks -->
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M44,37.5 L45.2,41"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M62.8,37.5 L64,41"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M74.5,48 L71,49.2"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M74.5,68 L71,66.8"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M33.2,48 L37,49.2"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M33.2,68 L37,66.8"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M44,78.5 L45.2,75"/>
+    <path android:strokeColor="#6C63FF" android:strokeWidth="1.2" android:pathData="M62.8,78.5 L64,75"/>
+
+    <!-- Hour hand (pointing to ~10 o'clock = focus) -->
+    <path
+        android:strokeColor="#6C63FF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,58 L44,48"/>
+
+    <!-- Minute hand (pointing up = 25 min focus) -->
+    <path
+        android:strokeColor="#FF6584"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,58 L54,40"/>
+
+    <!-- Center dot -->
+    <path
+        android:fillColor="#6C63FF"
+        android:pathData="M54,58 m-3.5,0 a3.5,3.5 0,1 1,7 0 a3.5,3.5 0,1 1,-7 0"/>
+
+    <!-- Top button (crown of timer) -->
+    <path
+        android:fillColor="#FF6584"
+        android:pathData="M49,28 L59,28 L58,32 L50,32 Z"/>
+
+    <!-- Small leaf/stem accent -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M54,28 Q50,22 56,20 Q58,24 54,28z"/>
+</vector>

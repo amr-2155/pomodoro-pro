@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pomodoro_app/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/task.dart';
@@ -90,7 +91,7 @@ class _TasksScreenState extends State<TasksScreen>
     DatabaseService.toggleTask(task.id);
     _loadTasks();
     if (!wasDone) {
-      _showNotification('Task completed!', AppColors.success, undo: () {
+      _showNotification(AppLocalizations.of(context).taskCompleted, AppColors.success, undo: () {
         DatabaseService.toggleTask(task.id);
         _loadTasks();
       });
@@ -115,7 +116,7 @@ class _TasksScreenState extends State<TasksScreen>
   void _deleteTask(Task task) {
     DatabaseService.deleteTask(task.id);
     _loadTasks();
-    _showNotification('Task deleted', AppColors.error, undo: () {
+    _showNotification(AppLocalizations.of(context).taskDeleted, AppColors.error, undo: () {
       DatabaseService.addTask(task);
       _loadTasks();
     });
@@ -126,12 +127,12 @@ class _TasksScreenState extends State<TasksScreen>
     DatabaseService.updateTask(task);
     _loadTasks();
     final label = DateUtils.isSameDay(date, DateTime.now())
-        ? 'today'
+        ? AppLocalizations.of(context).today
         : DateUtils.isSameDay(date,
                 DateTime.now().add(const Duration(days: 1)))
-            ? 'tomorrow'
-            : 'other day';
-    _showNotification('Task moved to $label', AppColors.primary);
+            ? AppLocalizations.of(context).tomorrow
+            : AppLocalizations.of(context).otherDay;
+    _showNotification('${AppLocalizations.of(context).taskMovedTo} $label', AppColors.primary);
   }
 
   void _clearCompleted() {
@@ -141,7 +142,7 @@ class _TasksScreenState extends State<TasksScreen>
     }
     _loadTasks();
     _showNotification(
-        '${completed.length} completed task${completed.length != 1 ? 's' : ''} cleared',
+        '${completed.length} ${AppLocalizations.of(context).completedCleared}',
         AppColors.primary, undo: () {
       for (final task in completed) {
         DatabaseService.addTask(task);
@@ -197,9 +198,9 @@ class _TasksScreenState extends State<TasksScreen>
                         _notificationEntry?.remove();
                         _notificationEntry = null;
                       },
-                      child: const Text(
-                        'UNDO',
-                        style: TextStyle(
+                      child: Text(
+                        AppLocalizations.of(ctx).undoLabel,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
@@ -229,9 +230,11 @@ class _TasksScreenState extends State<TasksScreen>
     final project = task.projectId != null
         ? DatabaseService.getProject(task.projectId!)
         : null;
-    final duration = project?.defaultDuration ?? DatabaseService.focusDuration;
-    timer.setDuration(TimerMode.focus, duration);
-    _showNotification('Focusing on "${task.title}" — go to Timer tab', AppColors.primary);
+    final durationSeconds = project != null
+        ? project.defaultDuration
+        : DatabaseService.focusDuration;
+    timer.setDurationSeconds(TimerMode.focus, durationSeconds);
+    _showNotification('${AppLocalizations.of(context).focusOnTaskMsg} "${task.title}"', AppColors.primary);
   }
 
   List<Task> get _filteredActiveTasks {
@@ -342,12 +345,8 @@ class _TasksScreenState extends State<TasksScreen>
           Row(
             children: [
               Text(
-                "Today's Tasks",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+                AppLocalizations.of(context).todayTasks,
+                style: Theme.of(context).textTheme.displaySmall,
               ),
               const Spacer(),
               GestureDetector(
@@ -396,7 +395,7 @@ class _TasksScreenState extends State<TasksScreen>
                             size: 14, color: AppColors.error),
                         const SizedBox(width: 4),
                         Text(
-                          'Clear $completedCount',
+                          '${AppLocalizations.of(context).clearDone} $completedCount',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -440,7 +439,7 @@ class _TasksScreenState extends State<TasksScreen>
               autofocus: true,
               onChanged: (v) => setState(() => _searchQuery = v),
               decoration: InputDecoration(
-                hintText: 'Search tasks...',
+                hintText: AppLocalizations.of(context).searchTasks,
                 prefixIcon: Icon(Icons.search_rounded,
                     size: 18, color: Colors.grey[400]),
                 suffixIcon: _searchQuery.isNotEmpty
@@ -530,7 +529,7 @@ class _TasksScreenState extends State<TasksScreen>
                           : Colors.grey[500]),
                   const SizedBox(width: 4),
                   Text(
-                    'All',
+                    AppLocalizations.of(context).all,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -601,11 +600,12 @@ class _TasksScreenState extends State<TasksScreen>
         children: [
           Icon(Icons.sort_rounded, size: 16, color: Colors.grey[500]),
           const SizedBox(width: 4),
-          Text('Sort:', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          Text(AppLocalizations.of(context).sort,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500])),
           const SizedBox(width: 6),
-          _sortChip('Priority', 'priority', isDark),
+          _sortChip(AppLocalizations.of(context).priority, 'priority', isDark),
           const SizedBox(width: 4),
-          _sortChip('Date', 'date', isDark),
+          _sortChip(AppLocalizations.of(context).date, 'date', isDark),
           const SizedBox(width: 4),
           _sortChip('A-Z', 'alpha', isDark),
           const Spacer(),
@@ -634,7 +634,9 @@ class _TasksScreenState extends State<TasksScreen>
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      _reorderMode ? 'Done' : 'Reorder',
+                      _reorderMode
+                          ? AppLocalizations.of(context).done
+                          : AppLocalizations.of(context).reorder,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -713,7 +715,7 @@ class _TasksScreenState extends State<TasksScreen>
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${completedTasks.length} completed',
+                      '${completedTasks.length} ${AppLocalizations.of(context).completed}',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -779,7 +781,7 @@ class _TasksScreenState extends State<TasksScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'No tasks for today',
+            AppLocalizations.of(context).noTasksForToday,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w600,
@@ -788,7 +790,7 @@ class _TasksScreenState extends State<TasksScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Add a task below to get started',
+            AppLocalizations.of(context).addTaskBelow,
             style: TextStyle(color: Colors.grey[400], fontSize: 13),
           ),
         ],
@@ -823,12 +825,13 @@ class _TasksScreenState extends State<TasksScreen>
           color: AppColors.error.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.delete_rounded, color: Colors.white),
-            SizedBox(height: 4),
-            Text('Delete', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            const Icon(Icons.delete_rounded, color: Colors.white),
+            const SizedBox(height: 4),
+            Text(AppLocalizations.of(context).deleteTask,
+                style: const TextStyle(color: Colors.white70, fontSize: 11)),
           ],
         ),
       ),
@@ -851,7 +854,9 @@ class _TasksScreenState extends State<TasksScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              isActive ? 'Done' : 'Undo',
+              isActive
+                  ? AppLocalizations.of(context).done
+                  : AppLocalizations.of(context).undoLabel,
               style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
@@ -1158,7 +1163,7 @@ class _TasksScreenState extends State<TasksScreen>
                 onSubmitted: (_) => _addTask(),
                 textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
-                  hintText: 'Add a task...',
+                  hintText: AppLocalizations.of(context).addTaskHint,
                   prefixIcon: Icon(Icons.add_task_rounded,
                       color: Colors.grey[400], size: 20),
                   filled: true,
@@ -1230,9 +1235,9 @@ class _TasksScreenState extends State<TasksScreen>
                       color: Colors.grey.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
-              const Text('Assign to Project',
+              Text(AppLocalizations.of(context).assignToProject,
                   style:
-                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               ListTile(
                 leading: Container(
@@ -1244,7 +1249,7 @@ class _TasksScreenState extends State<TasksScreen>
                   child: const Icon(Icons.close_rounded,
                       size: 18, color: Colors.grey),
                 ),
-                title: const Text('No Project'),
+                title: Text(AppLocalizations.of(context).noProject),
                 onTap: () {
                   setState(() => _selectedProjectId = null);
                   Navigator.pop(ctx);
@@ -1320,7 +1325,7 @@ class _TasksScreenState extends State<TasksScreen>
               const SizedBox(height: 16),
               _optionTile(
                 icon: Icons.edit_rounded,
-                label: 'Edit Task',
+                label: AppLocalizations.of(context).editTask,
                 color: AppColors.primary,
                 isDark: isDark,
                 onTap: () {
@@ -1331,7 +1336,7 @@ class _TasksScreenState extends State<TasksScreen>
               if (!task.isDone) ...[
                 _optionTile(
                   icon: Icons.play_arrow_rounded,
-                  label: 'Focus on this Task',
+                  label: AppLocalizations.of(context).focusOnTask,
                   color: AppColors.focusColor,
                   isDark: isDark,
                   onTap: () {
@@ -1341,7 +1346,7 @@ class _TasksScreenState extends State<TasksScreen>
                 ),
                 _optionTile(
                   icon: Icons.today_rounded,
-                  label: 'Keep for Tomorrow',
+                  label: AppLocalizations.of(context).keepForTomorrow,
                   color: AppColors.warning,
                   isDark: isDark,
                   onTap: () {
@@ -1353,7 +1358,7 @@ class _TasksScreenState extends State<TasksScreen>
                 ),
                 _optionTile(
                   icon: Icons.check_circle_rounded,
-                  label: 'Mark as Done',
+                  label: AppLocalizations.of(context).markDone,
                   color: AppColors.success,
                   isDark: isDark,
                   onTap: () {
@@ -1365,7 +1370,7 @@ class _TasksScreenState extends State<TasksScreen>
               if (task.isDone)
                 _optionTile(
                   icon: Icons.replay_rounded,
-                  label: 'Mark as Not Done',
+                  label: AppLocalizations.of(context).markNotDone,
                   color: AppColors.primary,
                   isDark: isDark,
                   onTap: () {
@@ -1375,7 +1380,7 @@ class _TasksScreenState extends State<TasksScreen>
                 ),
               _optionTile(
                 icon: Icons.delete_outline_rounded,
-                label: 'Delete Task',
+                label: AppLocalizations.of(context).deleteTask,
                 color: AppColors.error,
                 isDark: isDark,
                 onTap: () {
@@ -1493,7 +1498,7 @@ class _TasksScreenState extends State<TasksScreen>
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Edit Task',
+                          child: Text(AppLocalizations.of(context).editTask,
                               style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -1524,7 +1529,7 @@ class _TasksScreenState extends State<TasksScreen>
                       controller: titleController,
                       autofocus: true,
                       decoration: InputDecoration(
-                        hintText: 'Task title',
+                        hintText: AppLocalizations.of(context).taskTitle,
                         filled: true,
                         fillColor: isDark
                             ? Colors.white.withValues(alpha: 0.05)
@@ -1545,7 +1550,7 @@ class _TasksScreenState extends State<TasksScreen>
                       controller: descController,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        hintText: 'Description (optional)',
+                        hintText: AppLocalizations.of(context).descriptionOptional,
                         filled: true,
                         fillColor: isDark
                             ? Colors.white.withValues(alpha: 0.05)
@@ -1562,7 +1567,7 @@ class _TasksScreenState extends State<TasksScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text('Priority',
+                    Text(AppLocalizations.of(context).priority,
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -1572,21 +1577,21 @@ class _TasksScreenState extends State<TasksScreen>
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        _priorityOption('None', 0, priority,
+                        _priorityOption(AppLocalizations.of(context).priorityNone, 0, priority,
                             (v) => setSheetState(() => priority = v), isDark),
                         const SizedBox(width: 6),
-                        _priorityOption('Low', 1, priority,
+                        _priorityOption(AppLocalizations.of(context).priorityLow, 1, priority,
                             (v) => setSheetState(() => priority = v), isDark),
                         const SizedBox(width: 6),
-                        _priorityOption('Medium', 2, priority,
+                        _priorityOption(AppLocalizations.of(context).priorityMedium, 2, priority,
                             (v) => setSheetState(() => priority = v), isDark),
                         const SizedBox(width: 6),
-                        _priorityOption('High', 3, priority,
+                        _priorityOption(AppLocalizations.of(context).priorityHigh, 3, priority,
                             (v) => setSheetState(() => priority = v), isDark),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text('Estimated Pomodoros',
+                    Text(AppLocalizations.of(context).estimatedPomodoros,
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -1698,7 +1703,7 @@ class _TasksScreenState extends State<TasksScreen>
                             backgroundColor: AppColors.primary,
                             padding:
                                 const EdgeInsets.symmetric(vertical: 14)),
-                        child: const Text('Save'),
+                        child: Text(AppLocalizations.of(context).save),
                       ),
                     ),
                   ],

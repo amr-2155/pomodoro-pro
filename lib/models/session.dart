@@ -31,6 +31,22 @@ class Session extends HiveObject {
   @HiveField(8)
   String? taskId;
 
+  @HiveField(9)
+  int? actualMinutes;
+
+  @HiveField(10)
+  DateTime? startTime;
+
+  @HiveField(11)
+  DateTime? endTime;
+
+  @HiveField(12)
+  int? actualSeconds;
+
+  /// Tasbeeh repetitions captured in this session (null for timer sessions).
+  @HiveField(13)
+  int? count;
+
   Session({
     required this.id,
     required this.projectId,
@@ -41,7 +57,12 @@ class Session extends HiveObject {
     this.rating,
     this.notes,
     this.taskId,
-  }) : date = date ?? DateTime.now();
+    this.actualMinutes,
+    this.startTime,
+    this.endTime,
+    this.actualSeconds,
+    this.count,
+  }) : date = date ?? startTime ?? DateTime.now();
 
   double get durationHours => durationMinutes / 60.0;
 }

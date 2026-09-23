@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/number_formatter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/project.dart';
 import '../models/session.dart';
@@ -6,6 +7,7 @@ import '../services/database_service.dart';
 import '../services/timer_service.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
+import '../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
@@ -48,7 +50,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   Widget build(BuildContext context) {
     final color = Color(_project.colorValue);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final l10n = AppLocalizations.of(context);
+    final dayNames = [l10n.sat, l10n.sun, l10n.mon, l10n.tue, l10n.wed, l10n.thu, l10n.fri];
     final maxMin = _weeklyMinutes.isNotEmpty
         ? _weeklyMinutes.reduce((a, b) => a > b ? a : b)
         : 0.0;
@@ -174,9 +177,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               Navigator.pop(context);
             },
             icon: const Icon(Icons.play_arrow_rounded, size: 24),
-            label: const Text(
-              'Quick Start Focus',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            label: Text(
+              '${AppLocalizations.of(context).quickStart} — ${AppLocalizations.of(context).focus}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: color,
@@ -193,20 +196,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Widget _buildQuickStats(Color color, bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       children: [
-        _buildMiniStat('Today', '${_todayMinutes}min', Icons.today_rounded,
+        _buildMiniStat(l10n.today, '${fmtMin(_todayMinutes)}', Icons.today_rounded,
             color, isDark),
         const SizedBox(width: 10),
-        _buildMiniStat('Week', '${_weekMinutes}min', Icons.date_range_rounded,
-            color, isDark),
-        const SizedBox(width: 10),
-        _buildMiniStat(
-            'Sessions', '$_weekSessions', Icons.local_fire_department_rounded,
+        _buildMiniStat(l10n.weeklyChart, '${fmtMin(_weekMinutes)}', Icons.date_range_rounded,
             color, isDark),
         const SizedBox(width: 10),
         _buildMiniStat(
-            'Streak', '$_streak days', Icons.bolt_rounded, color, isDark),
+            l10n.sessionsCount, '$_weekSessions', Icons.local_fire_department_rounded,
+            color, isDark),
+        const SizedBox(width: 10),
+        _buildMiniStat(
+            l10n.dayStreak, '$_streak', Icons.bolt_rounded, color, isDark),
       ],
     );
   }
@@ -253,6 +257,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
   Widget _buildWeeklyChart(
       List<String> dayNames, double maxMin, Color color, bool isDark) {
+    // RTL: reverse so Saturday is on the right.
+    final rName = List<String>.from(dayNames.reversed);
+    final rMin = List<double>.from(_weeklyMinutes.reversed);
+    final rToday = 6 - ((DateTime.now().weekday + 1) % 7);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -282,9 +290,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 child: Icon(Icons.bar_chart_rounded, color: color, size: 18),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Weekly Activity',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Text(
+                AppLocalizations.of(context).weeklyOverview,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -299,7 +307,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
-                        '${rod.toY.toInt()}min',
+                        '${fmtMin(rod.toY.toInt())}',
                         const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -317,12 +325,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
                         if (index >= 0 && index < 7) {
-                          final isToday =
-                              index == DateTime.now().weekday - 1;
+                          final isToday = index == rToday;
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              dayNames[index],
+                              rName[index],
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: isToday
@@ -369,12 +376,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: List.generate(7, (index) {
-                  final isToday = index == DateTime.now().weekday - 1;
+                  final isToday = index == rToday;
                   return BarChartGroupData(
                     x: index,
                     barRods: [
                       BarChartRodData(
-                        toY: _weeklyMinutes[index],
+                        toY: rMin[index],
                         color: isToday
                             ? color
                             : color.withValues(alpha: 0.2),
@@ -431,8 +438,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               const SizedBox(width: 12),
               Text(
                 _project.weeklyGoalMinutes > 0
-                    ? 'Weekly Goal: ${_project.weeklyGoalMinutes}min'
-                    : 'No Weekly Goal Set',
+                    ? '${AppLocalizations.of(context).weeklyGoalMin}: '
+                    : '${AppLocalizations.of(context).weeklyGoalMin}: ${AppLocalizations.of(context).off}',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
@@ -474,7 +481,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${_weekMinutes}min of ${_project.weeklyGoalMinutes}min',
+              '${fmtMin(_weekMinutes)}  ',
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
             ),
           ],
@@ -514,9 +521,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     color: AppColors.accent, size: 18),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Recent Sessions',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Text(
+                AppLocalizations.of(context).viewAllSessions,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -526,7 +533,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               padding: const EdgeInsets.all(24),
               child: Center(
                 child: Text(
-                  'No sessions yet.\nStart your first focus session!',
+                  AppLocalizations.of(context).noSessionsYet,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[400], fontSize: 13),
                 ),
@@ -563,7 +570,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            session.completed ? 'Completed' : 'Skipped',
+                            session.completed ? AppLocalizations.of(context).completed : AppLocalizations.of(context).skip,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -586,7 +593,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${session.durationMinutes}min',
+                        '${fmtMin(session.actualMinutes ?? session.durationMinutes)}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

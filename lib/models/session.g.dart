@@ -26,13 +26,18 @@ class SessionAdapter extends TypeAdapter<Session> {
       rating: fields[6] as int?,
       notes: fields[7] as String?,
       taskId: fields[8] as String?,
+      actualMinutes: fields[9] as int?,
+      startTime: fields[10] as DateTime?,
+      endTime: fields[11] as DateTime?,
+      actualSeconds: fields[12] as int?,
+      count: fields[13] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Session obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +55,17 @@ class SessionAdapter extends TypeAdapter<Session> {
       ..writeByte(7)
       ..write(obj.notes)
       ..writeByte(8)
-      ..write(obj.taskId);
+      ..write(obj.taskId)
+      ..writeByte(9)
+      ..write(obj.actualMinutes)
+      ..writeByte(10)
+      ..write(obj.startTime)
+      ..writeByte(11)
+      ..write(obj.endTime)
+      ..writeByte(12)
+      ..write(obj.actualSeconds)
+      ..writeByte(13)
+      ..write(obj.count);
   }
 
   @override

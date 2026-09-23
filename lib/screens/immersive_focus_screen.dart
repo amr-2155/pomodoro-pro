@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/project.dart';
 import '../services/timer_service.dart';
-import '../services/database_service.dart';
 import '../services/ambient_sound_service.dart';
-import '../widgets/completion_celebration.dart';
 import '../widgets/break_screen.dart';
 import '../utils/page_transitions.dart';
+import '../utils/constants.dart';
+import '../l10n/app_localizations.dart';
 
 class ImmersiveFocusScreen extends StatefulWidget {
   final Project project;
@@ -73,10 +73,9 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
   void _startTimer() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final timer = context.read<TimerService>();
-      timer.onSessionComplete = _onSessionComplete;
       timer.onBreakStart = _onBreakStart;
       timer.setProject(widget.project.id);
-      timer.setDuration(TimerMode.focus, widget.project.defaultDuration);
+            timer.setDurationSeconds(TimerMode.focus, widget.project.defaultDuration);
       timer.start();
     });
   }
@@ -84,7 +83,6 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
   @override
   void dispose() {
     final timer = context.read<TimerService>();
-    timer.onSessionComplete = null;
     timer.onBreakStart = null;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _fadeController.dispose();
@@ -92,48 +90,20 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
     super.dispose();
   }
 
-  void _onSessionComplete() {
-    final timer = context.read<TimerService>();
-    AmbientSoundService.stop();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        CompletionCelebration.show(
-          context,
-          sessionCount: timer.sessionCount,
-          isMilestone: timer.isMilestone,
-          quote: timer.completionQuote,
-          sessionId: timer.lastCompletedSessionId,
-          modeLabel: 'Focus',
-          durationMinutes: timer.totalSeconds ~/ 60,
-          projectName: widget.project.name,
-        ).then((_) {
-          if (mounted && DatabaseService.autoStartBreaks) {
-            final breakMin = timer.mode == TimerMode.longBreak
-                ? DatabaseService.longBreakDuration
-                : DatabaseService.shortBreakDuration;
-            _onBreakStart(breakMin);
-          } else if (mounted && DatabaseService.autoStartPomodoros) {
-            timer.start();
-          }
-        });
-      }
-    });
-  }
-
-  void _onBreakStart(int breakMinutes) {
+  void _onBreakStart(int breakSeconds) {
     AmbientSoundService.stop();
     if (!mounted) return;
     Navigator.push(
       context,
       AppModalRoute(page: BreakScreen(
-        breakMinutes: breakMinutes,
+        breakSeconds: breakSeconds,
         onBreakComplete: () {
           AmbientSoundService.stop();
           if (mounted) {
             Navigator.pop(context);
             final timer = context.read<TimerService>();
             timer.reset();
-            timer.setDuration(TimerMode.focus, widget.project.defaultDuration);
+      timer.setDurationSeconds(TimerMode.focus, widget.project.defaultDuration);
             timer.start();
           }
         },
@@ -161,9 +131,9 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1D3A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -176,9 +146,9 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Ambient Sounds',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context).ambientSounds,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -473,7 +443,7 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      timer.running ? 'Focusing...' : 'Paused',
+                      timer.running ? '${AppLocalizations.of(context).focus}...' : AppLocalizations.of(context).pause,
                       style: TextStyle(
                         fontSize: 14,
                         color: _projectColor.withValues(alpha: 0.8),
@@ -510,7 +480,7 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
           FadeTransition(
             opacity: _fadeAnim,
             child: Text(
-              '${timer.sessionCount} sessions today',
+              '${timer.sessionCount} ${AppLocalizations.of(context).sessionsCount} ${AppLocalizations.of(context).today}',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.3),
                 fontSize: 13,
@@ -536,8 +506,8 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
         _fadeController.forward();
       },
       child: Container(
-        width: 72,
-        height: 72,
+        width: 76,
+        height: 76,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
@@ -567,8 +537,8 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 46,
-        height: 46,
+        width: 50,
+        height: 50,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: 0.08),

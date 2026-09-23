@@ -27,15 +27,18 @@ class ProjectAdapter extends TypeAdapter<Project> {
       isArchived: fields[7] as bool,
       description: fields[8] as String? ?? '',
       weeklyGoalMinutes: fields[9] as int? ?? 0,
-      defaultDuration: fields[10] as int? ?? 25,
+      defaultDuration: fields[10] as int? ?? 1500,
       theme: fields[11] as String? ?? 'default',
+      dailyGoalMinutes: fields[12] as int? ?? 0,
+      includeInWeeklyGoal: fields[13] as bool? ?? true,
+      tasbeehGoal: fields[14] as int? ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, Project obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +62,13 @@ class ProjectAdapter extends TypeAdapter<Project> {
       ..writeByte(10)
       ..write(obj.defaultDuration)
       ..writeByte(11)
-      ..write(obj.theme);
+      ..write(obj.theme)
+      ..writeByte(12)
+      ..write(obj.dailyGoalMinutes)
+      ..writeByte(13)
+      ..write(obj.includeInWeeklyGoal)
+      ..writeByte(14)
+      ..write(obj.tasbeehGoal);
   }
 
   @override

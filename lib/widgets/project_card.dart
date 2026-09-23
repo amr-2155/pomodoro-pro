@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../utils/number_formatter.dart';
+import '../l10n/app_localizations.dart';
 import '../models/project.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
@@ -121,12 +123,39 @@ class ProjectCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        '${project.totalSessions} sessions · ${project.totalHours.toStringAsFixed(1)}h total',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${project.totalSessions} ${AppLocalizations.of(context).sessions} · ${project.totalHours.toStringAsFixed(1)}h',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (progress >= 1) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                AppLocalizations.of(context).completedBadge,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -201,7 +230,7 @@ class ProjectCard extends StatelessWidget {
                 children: [
                   _buildChip(
                     Icons.today_rounded,
-                    '${todayMin}min',
+                    '${fmtMin(todayMin)}',
                     'Today',
                     color,
                     isDark,
@@ -214,7 +243,7 @@ class ProjectCard extends StatelessWidget {
                   ),
                   _buildChip(
                     Icons.date_range_rounded,
-                    '${weekMin}min',
+                    '${fmtMin(weekMin)}',
                     'Week',
                     color,
                     isDark,
@@ -241,7 +270,7 @@ class ProjectCard extends StatelessWidget {
                     ),
                     _buildChip(
                       Icons.flag_rounded,
-                      '${(progress * 100).clamp(0, 100).toInt()}%',
+                      '${(progress * 100).toInt()}%',
                       'Goal',
                       progress >= 1 ? AppColors.success : color,
                       isDark,

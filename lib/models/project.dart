@@ -40,6 +40,16 @@ class Project extends HiveObject {
   @HiveField(11)
   String theme;
 
+  @HiveField(12)
+  int dailyGoalMinutes;
+
+  @HiveField(13)
+  bool includeInWeeklyGoal;
+
+  /// Numeric tasbeeh goal (repetitions). 0 = no counter goal.
+  @HiveField(14)
+  int tasbeehGoal;
+
   Project({
     required this.id,
     required this.name,
@@ -51,8 +61,11 @@ class Project extends HiveObject {
     this.isArchived = false,
     this.description = '',
     this.weeklyGoalMinutes = 0,
-    this.defaultDuration = 25,
+    this.defaultDuration = 1500,
     this.theme = 'default',
+    this.dailyGoalMinutes = 0,
+    this.includeInWeeklyGoal = true,
+    this.tasbeehGoal = 0,
   }) : createdAt = createdAt ?? DateTime.now();
 
   double get totalHours => totalMinutes / 60.0;
@@ -71,6 +84,9 @@ class Project extends HiveObject {
       'weeklyGoalMinutes': weeklyGoalMinutes,
       'defaultDuration': defaultDuration,
       'theme': theme,
+      'dailyGoalMinutes': dailyGoalMinutes,
+      'includeInWeeklyGoal': includeInWeeklyGoal,
+      'tasbeehGoal': tasbeehGoal,
     };
   }
 
@@ -88,8 +104,11 @@ class Project extends HiveObject {
       isArchived: map['isArchived'] ?? false,
       description: map['description'] ?? '',
       weeklyGoalMinutes: map['weeklyGoalMinutes'] ?? 0,
-      defaultDuration: map['defaultDuration'] ?? 25,
+      defaultDuration: map['defaultDuration'] ?? 1500,
       theme: map['theme'] ?? 'default',
+      dailyGoalMinutes: map['dailyGoalMinutes'] ?? 0,
+      includeInWeeklyGoal: map['includeInWeeklyGoal'] ?? true,
+      tasbeehGoal: map['tasbeehGoal'] ?? 0,
     );
   }
 }
