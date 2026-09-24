@@ -188,6 +188,7 @@ class AppLocalizations {
   String get totalTasbeehLabel => _t({'ar': 'إجمالي التسبيحات', 'en': 'Total tasbeeh'});
   String get goalCardTitle => _t({'ar': 'الهدف', 'en': 'Goal'});
   String get noGoalSet => _t({'ar': 'اضغط مطولًا على الدائرة لتحديد هدف', 'en': 'Long-press the circle to set a goal'});
+  String get ascendingTimeLabel => _t({'ar': 'الوقت', 'en': 'time'});
 
   // ─── Project Goal Editor ───
   String get unitMinuteShort => _t({'ar': 'د', 'en': 'm'});

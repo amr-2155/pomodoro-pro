@@ -1365,7 +1365,9 @@ class _TasbeehView extends StatefulWidget {
 class _TasbeehViewState extends State<_TasbeehView>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulse;
+  Timer? _ticker;
   bool _pressed = false;
+  int _tick = 0;
 
   @override
   void initState() {
@@ -1375,10 +1377,19 @@ class _TasbeehViewState extends State<_TasbeehView>
       duration: const Duration(milliseconds: 160),
       value: 1.0,
     );
+    // Live ascending time display while the dhikr session is active.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final svc = context.read<TasbeehService>();
+      if (svc.isActive) {
+        setState(() => _tick++);
+      }
+    });
   }
 
-  @override
+@override
   void dispose() {
+    _ticker?.cancel();
     _pulse.dispose();
     super.dispose();
   }
@@ -1511,6 +1522,17 @@ class _TasbeehViewState extends State<_TasbeehView>
         ),
 
         const SizedBox(height: 18),
+
+        // ── Live time + count header (ascending stopwatch) ──
+        const SizedBox(height: 10),
+        _LiveTasbeehTime(
+          key: ValueKey(_tick),
+          elapsed: svc.elapsedSeconds,
+          active: svc.isActive,
+          accent: accent,
+          isDark: widget.isDark,
+        ),
+        const SizedBox(height: 12),
 
         // ── THE CIRCLE — single GestureDetector owns everything ──
         Listener(
@@ -1924,6 +1946,61 @@ class _TasbeehViewState extends State<_TasbeehView>
           ),
         );
       },
+    );
+  }
+}
+
+class _LiveTasbeehTime extends StatelessWidget {
+  final int elapsed;
+  final bool active;
+  final Color accent;
+  final bool isDark;
+
+  const _LiveTasbeehTime({
+    super.key,
+    required this.elapsed,
+    required this.active,
+    required this.accent,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final mm = (elapsed ~/ 60).toString().padLeft(2, '0');
+    final ss = (elapsed % 60).toString().padLeft(2, '0');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(active ? Icons.timer_rounded : Icons.timer_outlined,
+              size: 15, color: active ? accent : Colors.grey[500]),
+          const SizedBox(width: 6),
+Text(
+                            '$mm:$ss',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: active ? accent : Colors.grey[500],
+                            ),
+                          ),
+          const SizedBox(width: 6),
+          Text(
+            l10n.ascendingTimeLabel,
+            style: TextStyle(
+                fontSize: 10.5, color: Colors.grey[500], height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 }
