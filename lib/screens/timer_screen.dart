@@ -27,7 +27,7 @@ class TimerScreen extends StatefulWidget {
 class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   String? _selectedProjectId;
   int _quoteOffset = 0;
-  bool _tasbihMode = false;
+  bool _tasbihMode = true;
   final FocusNode _focusNode = FocusNode();
 
   @override
