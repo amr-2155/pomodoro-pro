@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
 import '../utils/constants.dart';
 import 'timer_screen.dart';
-import 'dhikr_screen.dart';
 import 'projects_screen.dart';
 import 'statistics_screen.dart';
 import 'settings_screen.dart';
@@ -21,7 +20,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final List<Widget> _screens = [
     const TimerScreen(),
-    const DhikrScreen(),
     const ProjectsScreen(),
     const TasksScreen(),
     const StatisticsScreen(),
@@ -58,11 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.timer_outlined),
                   activeIcon: const Icon(Icons.timer),
                   label: l10n.timer,
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.self_improvement_outlined),
-                  activeIcon: const Icon(Icons.self_improvement),
-                  label: l10n.dhikrCounter,
                 ),
                 BottomNavigationBarItem(
                   icon: const Icon(Icons.folder_outlined),
