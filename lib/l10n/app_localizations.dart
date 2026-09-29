@@ -189,6 +189,8 @@ class AppLocalizations {
   String get goalCardTitle => _t({'ar': 'الهدف', 'en': 'Goal'});
   String get noGoalSet => _t({'ar': 'اضغط مطولًا على الدائرة لتحديد هدف', 'en': 'Long-press the circle to set a goal'});
   String get ascendingTimeLabel => _t({'ar': 'الوقت', 'en': 'time'});
+  String get dhikrTimeCounterTitle => _t({'ar': 'حاسبة الذكر والوقت', 'en': 'Dhikr & Time Counter'});
+  String get dhikrTimeCounterSub => _t({'ar': 'دوّس وعدّ، والوقت بيعدّ معاك تصاعديًا — بيتحفظ مع كل جلسة', 'en': 'Tap to count — time runs up live and is saved with each session'});
 
   // ─── Project Goal Editor ───
   String get unitMinuteShort => _t({'ar': 'د', 'en': 'm'});
