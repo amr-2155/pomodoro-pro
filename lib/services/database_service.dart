@@ -29,6 +29,13 @@ class DatabaseService {
   static final ValueNotifier<int> goalsRevision = ValueNotifier(0);
   static final ValueNotifier<Locale> localeNotifier = ValueNotifier(const Locale('ar'));
 
+  /// True only when the settings box was completely empty at startup,
+  /// i.e. the app has never run on this device (true fresh install).
+  /// Captured BEFORE migrations write their flags, so existing installs
+  /// (which always carry keys) are never mistaken for fresh ones.
+  static bool _isFreshInstall = false;
+  static bool get isFreshInstall => _isFreshInstall;
+
   static Future<void> init({String? hivePath}) async {
     if (hivePath != null) {
       Hive.init(hivePath);
@@ -48,6 +55,8 @@ class DatabaseService {
     _settings = await Hive.openBox(_settingsBox);
     _dayGoals = await Hive.openBox<DayGoal>(_dayGoalsBox);
     _customQuotes = await Hive.openBox(_customQuotesBox);
+
+    _isFreshInstall = _settings.isEmpty;
 
     await _migrateDurationsToSeconds();
     await _migrateProjectDurationsToSeconds();

@@ -71,6 +71,7 @@ class TimerService extends ChangeNotifier {
     _totalSeconds = DatabaseService.focusDuration;
     _restoreStopwatchIfNeeded();
     unawaited(_restoreCountdownIfNeeded());
+    _applyFirstLaunchDefaultMode();
     _lifecycleListener = AppLifecycleListener(
       onResume: _onResume,
       onHide: _onHide,
@@ -79,6 +80,19 @@ class TimerService extends ChangeNotifier {
   }
 
   void Function(int breakMinutes)? onBreakStart;
+
+  /// First-launch only: start in stopwatch (تصاعدي) mode so the
+  /// Dhikr & Time calculator is visible immediately without searching.
+  /// Runs only on a true fresh install (empty settings box) and never
+  /// overrides a pending session restore or any existing install.
+  void _applyFirstLaunchDefaultMode() {
+    if (!DatabaseService.isFreshInstall) return;
+    final restorePending =
+        DatabaseService.getSetting(_cdActive, defaultValue: false) == true ||
+            DatabaseService.getSetting(_swActive, defaultValue: false) == true;
+    if (restorePending) return;
+    _mode = TimerMode.stopwatch;
+  }
 
   int get seconds => _seconds;
   int get totalSeconds => _totalSeconds;

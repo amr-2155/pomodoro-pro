@@ -12,6 +12,7 @@ import '../utils/constants.dart';
 import '../utils/number_formatter.dart';
 import '../widgets/timer_circle.dart';
 import '../widgets/break_screen.dart';
+import '../widgets/tas3ady_panel.dart';
 import '../services/ambient_sound_service.dart';
 import '../utils/page_transitions.dart';
 import '../l10n/app_localizations.dart';
@@ -30,6 +31,7 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   int _quoteOffset = 0;
   bool _tasbihMode = true;
   final FocusNode _focusNode = FocusNode();
+  final GlobalKey _calcKey = GlobalKey();
 
   @override
   void initState() {
@@ -46,8 +48,25 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       if (timerService.pendingRestorePrompt) {
         _showRestoreDialog(timerService);
       }
+      if (DatabaseService.isFreshInstall) _scrollToCalculatorOnce();
       _focusNode.requestFocus();
     });
+  }
+
+  /// First launch only: gently bring the Dhikr & Time calculator into
+  /// view so it is visible without manual searching or scrolling.
+  /// Never runs for existing installs or on later opens.
+  Future<void> _scrollToCalculatorOnce() async {
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    final ctx = _calcKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
+    );
   }
 
   @override
@@ -1007,6 +1026,13 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                Visibility(
+                  key: _calcKey,
+                  visible: timer.mode == TimerMode.stopwatch,
+                  maintainState: true,
+                  child: Tas3adyDhikrCalculator(isDark: isDark),
                 ),
                 const SizedBox(height: 16),
                 _DhikrTimeCounterCard(
