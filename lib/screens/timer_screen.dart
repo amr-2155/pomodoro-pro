@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../services/timer_service.dart';
 import '../services/tasbeeh_service.dart';
 import '../services/database_service.dart';
-import 'dhikr_screen.dart';
 import '../utils/constants.dart';
 import '../utils/number_formatter.dart';
 import '../widgets/timer_circle.dart';
@@ -583,7 +582,6 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final timer = context.watch<TimerService>();
-    final tasbeeh = context.watch<TasbeehService>();
     final color = _getModeColor(timer.mode);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final interval = DatabaseService.longBreakInterval;
@@ -1033,18 +1031,6 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                   visible: timer.mode == TimerMode.stopwatch,
                   maintainState: true,
                   child: Tas3adyDhikrCalculator(isDark: isDark),
-                ),
-                const SizedBox(height: 16),
-                _DhikrTimeCounterCard(
-                  tasbeeh: tasbeeh,
-                  color: color,
-                  isDark: isDark,
-                  onOpen: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      AppPageRoute(page: const DhikrScreen()),
-                    );
-                  },
                 ),
                 const SizedBox(height: 16),
               ],
@@ -2197,103 +2183,6 @@ Text(label,
                   )),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DhikrTimeCounterCard extends StatelessWidget {
-  final TasbeehService tasbeeh;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onOpen;
-
-  const _DhikrTimeCounterCard({
-    required this.tasbeeh,
-    required this.color,
-    required this.isDark,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final elapsed = tasbeeh.elapsedSeconds;
-    final mm = (elapsed ~/ 60).toString().padLeft(2, '0');
-    final ss = (elapsed % 60).toString().padLeft(2, '0');
-    final accent = color;
-
-    return GestureDetector(
-      onTap: onOpen,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: accent.withValues(alpha: 0.3)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.12 : 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.timer_rounded,
-                color: tasbeeh.isActive ? accent : Colors.grey[500], size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.dhikrTimeCounterTitle,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '"${tasbeeh.currentDhikr}" • '
-                    '$mm:$ss ${l10n.ascendingTimeLabel}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${tasbeeh.count}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: accent,
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_left_rounded,
-                size: 20, color: Colors.grey[500]),
-          ],
         ),
       ),
     );
