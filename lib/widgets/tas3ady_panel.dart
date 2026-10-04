@@ -520,7 +520,6 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
               child: TextField(
                 controller: _customRepsCtrl,
                 keyboardType: TextInputType.number,
-                inputFormatters: [AppInputFormatters.digitsOnlyLocalized],
                 onChanged: (_) => _onChanged(),
                 style: TextStyle(fontSize: 13.5, color: textColor),
                 decoration: _inputDecoration(muted, hint: 'مخصص'),
@@ -580,13 +579,6 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         TextField(
           controller: _minutesCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            TextInputFormatter.withFunction((old, newValue) {
-              final t = normalizeDigits(newValue.text).replaceAll(',', '.');
-              if (t.isEmpty) return newValue;
-              return double.tryParse(t) != null ? newValue : old;
-            }),
-          ],
           onChanged: (_) => _onChanged(),
           style: TextStyle(fontSize: 13.5, color: textColor),
           decoration: _inputDecoration(muted, hint: 'مثال: 10'),
@@ -627,14 +619,6 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         TextField(
           controller: _speedCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            TextInputFormatter.withFunction((old, newValue) {
-              final t = normalizeDigits(newValue.text).replaceAll(',', '.');
-              if (t.isEmpty) return newValue;
-              if (t == '0') return old;
-              return double.tryParse(t) != null ? newValue : old;
-            }),
-          ],
           onChanged: (_) => _onChanged(),
           style: TextStyle(fontSize: 13.5, color: textColor),
           decoration: _inputDecoration(muted, hint: 'مثال: 2.5'),
@@ -816,7 +800,6 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
                 controller: _customMeasureRepsCtrl,
                 enabled: !_measuring,
                 keyboardType: TextInputType.number,
-                inputFormatters: [AppInputFormatters.digitsOnlyLocalized],
                 onChanged: (_) => _onChanged(),
                 style: TextStyle(fontSize: 12.5, color: textColor),
                 decoration: _inputDecoration(muted, hint: 'عدد مخصص'),
