@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../l10n/app_localizations.dart';
@@ -21,6 +22,19 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  /// Real build version (from pubspec), so testers can always confirm
+  /// exactly which build is installed. Never hardcode this string.
+  String? _pkgVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (!mounted) return;
+      setState(() => _pkgVersion = 'v${info.version}+${info.buildNumber}');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -111,12 +125,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSectionTitle(l10n.aboutSettings),
             if (!PwaService.isStandalone)
               _buildActionTile(l10n.installApp, l10n.installAppDesc, Icons.install_mobile_rounded, () => _installPwa(context)),
-            _buildActionTile(l10n.appVersion, l10n.builtWith, Icons.info_outline_rounded, () {}),
+            _buildActionTile(l10n.appVersion, _pkgVersion ?? l10n.builtWith, Icons.info_outline_rounded, () {}),
 
             const SizedBox(height: 40),
             Center(
               child: Text(
-                l10n.appVersion,
+                _pkgVersion ?? l10n.appVersion,
                 style: TextStyle(color: Colors.grey[400], fontSize: 12),
               ),
             ),

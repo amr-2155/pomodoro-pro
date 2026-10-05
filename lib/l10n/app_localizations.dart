@@ -272,7 +272,7 @@ class AppLocalizations {
     'ar': 'إضافة التطبيق إلى الشاشة الرئيسية',
     'en': 'Add Pomodoro Pro to your home screen',
   });
-  String get appVersion => 'Pomodoro Pro v1.0.0';
+  String get appVersion => 'Pomodoro Pro';
   String get builtWith => _t({
     'ar': 'صُنع باستخدام Flutter',
     'en': 'Built with Flutter',
