@@ -219,6 +219,30 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
 
   void _onChanged() => setState(() {});
 
+  /// Opens the built-in numeric keypad for [controller].
+  /// Number entry deliberately does NOT rely on the system keyboard:
+  /// every key mutates the controller programmatically (the same path
+  /// preset chips use), so typing/deleting works on any device, any
+  /// keyboard app, and on web — with zero IME involvement.
+  void _openKeypad({
+    required TextEditingController controller,
+    required bool decimal,
+    required String title,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (_) => _NumberPadSheet(
+        controller: controller,
+        decimal: decimal,
+        title: title,
+        isDark: widget.isDark,
+        onChanged: _onChanged,
+      ),
+    );
+  }
+
   void _startMeasurement() {
     _measureWatch = Stopwatch()..start();
     _measureElapsed = Duration.zero;
@@ -519,7 +543,14 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
               width: 92,
               child: TextField(
                 controller: _customRepsCtrl,
-                keyboardType: TextInputType.number,
+                readOnly: true,
+                showCursor: true,
+                enableInteractiveSelection: false,
+                onTap: () => _openKeypad(
+                  controller: _customRepsCtrl,
+                  decimal: false,
+                  title: 'عدد التكرارات',
+                ),
                 onChanged: (_) => _onChanged(),
                 style: TextStyle(fontSize: 13.5, color: textColor),
                 decoration: _inputDecoration(muted, hint: 'مخصص'),
@@ -578,7 +609,14 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         _fieldLabel('المدة المتاحة (بالدقائق)', textColor),
         TextField(
           controller: _minutesCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: true,
+          showCursor: true,
+          enableInteractiveSelection: false,
+          onTap: () => _openKeypad(
+            controller: _minutesCtrl,
+            decimal: true,
+            title: 'المدة المتاحة (بالدقائق)',
+          ),
           onChanged: (_) => _onChanged(),
           style: TextStyle(fontSize: 13.5, color: textColor),
           decoration: _inputDecoration(muted, hint: 'مثال: 10'),
@@ -618,7 +656,14 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         const SizedBox(height: 6),
         TextField(
           controller: _speedCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: true,
+          showCursor: true,
+          enableInteractiveSelection: false,
+          onTap: () => _openKeypad(
+            controller: _speedCtrl,
+            decimal: true,
+            title: 'السرعة (ثانية لكل تكرار)',
+          ),
           onChanged: (_) => _onChanged(),
           style: TextStyle(fontSize: 13.5, color: textColor),
           decoration: _inputDecoration(muted, hint: 'مثال: 2.5'),
@@ -799,7 +844,14 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
               child: TextField(
                 controller: _customMeasureRepsCtrl,
                 enabled: !_measuring,
-                keyboardType: TextInputType.number,
+                readOnly: true,
+                showCursor: true,
+                enableInteractiveSelection: false,
+                onTap: () => _openKeypad(
+                  controller: _customMeasureRepsCtrl,
+                  decimal: false,
+                  title: 'عدد مخصص',
+                ),
                 onChanged: (_) => _onChanged(),
                 style: TextStyle(fontSize: 12.5, color: textColor),
                 decoration: _inputDecoration(muted, hint: 'عدد مخصص'),
@@ -969,5 +1021,200 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
     if (!v.isFinite) return '—';
     if (v == v.roundToDouble()) return v.toStringAsFixed(0);
     return v.toStringAsFixed(2);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// لوحة أرقام داخلية: إدخال/حذف باللمس فقط، بدون كيبورد النظام.
+// ─────────────────────────────────────────────────────────────
+class _NumberPadSheet extends StatefulWidget {
+  final TextEditingController controller;
+  final bool decimal;
+  final String title;
+  final bool isDark;
+  final VoidCallback onChanged;
+
+  const _NumberPadSheet({
+    required this.controller,
+    required this.decimal,
+    required this.title,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  State<_NumberPadSheet> createState() => _NumberPadSheetState();
+}
+
+class _NumberPadSheetState extends State<_NumberPadSheet> {
+  static const _maxLen = 9;
+
+  void _press(String key) {
+    final ctrl = widget.controller;
+    var text = ctrl.text;
+    if (key == 'back') {
+      if (text.isNotEmpty) {
+        text = text.substring(0, text.length - 1);
+      }
+    } else if (key == 'clear') {
+      text = '';
+    } else if (key == '.') {
+      if (!widget.decimal) return;
+      if (text.contains('.') || text.contains(',')) return;
+      text = text.isEmpty ? '0.' : '$text.';
+    } else {
+      if (text.length >= _maxLen) return;
+      text = '$text$key';
+    }
+    ctrl.text = text;
+    ctrl.selection = TextSelection.collapsed(offset: text.length);
+    HapticFeedback.selectionClick();
+    widget.onChanged();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final muted = isDark ? Colors.grey[500] : Colors.grey[600];
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+    Widget keyCell(String key, {Widget? child, bool accent = false}) {
+      final enabled = key != 'none';
+      return GestureDetector(
+        onTap: enabled ? () => _press(key) : null,
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: accent
+                ? AppColors.primary.withValues(alpha: isDark ? 0.9 : 1)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : const Color(0xFFF0F1F6)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: child ??
+                Text(
+                  key,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: accent ? Colors.white : textColor,
+                  ),
+                ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  widget.controller.text.isEmpty
+                      ? '—'
+                      : widget.controller.text,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            mainAxisExtent: 52,
+            children: [
+              for (final k in keys) keyCell(k),
+              widget.decimal
+                  ? keyCell('.', accent: false)
+                  : keyCell('00'),
+              keyCell('0'),
+              keyCell('back',
+                  child: Icon(Icons.backspace_outlined,
+                      size: 22, color: muted)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _press('clear'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: muted,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('مسح'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('تم'),
+                ),
+              ),
+            ],
+          ),
+          ],
+        ),
+      ),
+    );
   }
 }
