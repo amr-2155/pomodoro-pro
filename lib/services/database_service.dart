@@ -262,6 +262,30 @@ class DatabaseService {
     goalsRevision.value++;
   }
 
+  /// Counts used by the storage panel in Settings.
+  static int get sessionCount => _sessions.length;
+  static int get projectCount => _projects.length;
+  static int get taskCount => _tasks.length;
+
+  /// Sessions older than [days]. Statistics only ever look back ~1 year,
+  /// so anything past that contributes nothing but storage growth.
+  static int countSessionsOlderThan(int days) {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    return _sessions.values.where((s) => s.date.isBefore(cutoff)).length;
+  }
+
+  /// Deletes sessions older than [days], keeping project counters correct.
+  /// Always explicit, never automatic: user data is only removed on a
+  /// deliberate action. Returns how many sessions were removed.
+  static Future<int> deleteSessionsOlderThan(int days) async {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final stale = _sessions.values.where((s) => s.date.isBefore(cutoff)).toList();
+    for (final s in stale) {
+      await deleteSession(s.id);
+    }
+    return stale.length;
+  }
+
   // Day Goals
   static String dateKeyOf(DateTime date) {
     final d = DateTime(date.year, date.month, date.day);

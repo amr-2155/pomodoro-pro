@@ -119,6 +119,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildActionTile(l10n.createBackup, l10n.createBackupDesc, Icons.cloud_download_rounded, () => _createBackup(context)),
             _buildActionTile(l10n.restoreBackup, l10n.restoreBackupDesc, Icons.cloud_upload_rounded, () => _restoreBackup(context)),
             _buildActionTile(l10n.exportCsv, l10n.exportCsvDesc, Icons.table_chart_rounded, () => _exportData(context)),
+            _buildActionTile(
+              'تنظيف التخزين',
+              'حذف الجلسات الأقدم من سنة — يحرر المساحة (${DatabaseService.sessionCount} جلسة محفوظة)',
+              Icons.auto_delete_outlined,
+              () => _confirmTrimOldSessions(context),
+            ),
             _buildActionTile(l10n.resetAllData, l10n.resetAllDataDesc, Icons.delete_forever_rounded, () => _confirmReset(context), isDestructive: true),
 
             const SizedBox(height: 12),
@@ -670,7 +676,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final projectName = _csvEscape(project?.name ?? s.projectId);
       final rating = s.rating?.toString() ?? '';
       final notes = _csvEscape(s.notes ?? '');
-      csv.writeln('${s.date.toIso8601String()},$projectName,${s.actualMinutes ?? s.durationMinutes},${s.completed},${s.sessionType},$rating,$notes');
+      // date only (YYYY-MM-DD): spreadsheets sort this correctly, unlike a
+      // full ISO timestamp with a time zone suffix.
+      final d = s.date;
+      final day =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      csv.writeln('$day,$projectName,${s.actualMinutes ?? s.durationMinutes},${s.completed},${s.sessionType},$rating,$notes');
     }
     csv.writeln('');
     csv.writeln('=== TASKS ===');
@@ -697,6 +708,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return '"${field.replaceAll('"', '""')}"';
     }
     return field;
+  }
+
+  /// Explicit, never-automatic storage trim. Statistics only read ~1 year
+  /// back, so older sessions are pure storage growth — but the user always
+  /// decides, and sees exactly how many rows will go.
+  Future<void> _confirmTrimOldSessions(BuildContext outerContext) async {
+    const days = 365;
+    final l10n = AppLocalizations.of(outerContext);
+    final isDark = Theme.of(outerContext).brightness == Brightness.dark;
+    final stale = DatabaseService.countSessionsOlderThan(days);
+    final messenger = ScaffoldMessenger.of(outerContext);
+
+    if (stale == 0) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('لا توجد جلسات أقدم من سنة'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: outerContext,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('حذف الجلسات القديمة؟'),
+        content: Text(
+          'سيتم حذف $stale جلسة أقدم من سنة لتحرير المساحة.\n'
+          'الإحصائيات لا تحتاج أكثر من سنة، لكنها لن تُستعاد لاحقًا.\n'
+          'ننصح بأخذ نسخة احتياطية أولًا.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel)),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    final removed = await DatabaseService.deleteSessionsOlderThan(days);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('تم حذف $removed جلسة'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   void _confirmReset(BuildContext outerContext) {

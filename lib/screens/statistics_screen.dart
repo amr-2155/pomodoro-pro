@@ -644,7 +644,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           const SizedBox(height: 20),
           SizedBox(
             height: 180,
-            child: BarChart(
+            // Screen readers get the real numbers instead of silence.
+            child: Semantics(
+              label: _weeklyChartSemantics(dailyMinutes, dayNames),
+              excludeSemantics: true,
+              child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
                 maxY: maxMinutes > 0 ? maxMinutes + 10 : 100,
@@ -745,10 +749,23 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 }),
               ),
             ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  /// Plain-language description of the weekly chart for screen readers.
+  String _weeklyChartSemantics(List<double> dailyMinutes, List<String> dayNames) {
+    final l10n = AppLocalizations.of(context);
+    final parts = <String>[];
+    for (var i = 0; i < dailyMinutes.length && i < dayNames.length; i++) {
+      parts.add('${dayNames[i]}: ${dailyMinutes[i].round()}${l10n.minShort}');
+    }
+    final total = dailyMinutes.fold<double>(0, (a, b) => a + b).round();
+    return '${l10n.weeklyOverview} — ${parts.join('، ')}. '
+        '${l10n.total}: $total${l10n.minShort}';
   }
 
   Widget _buildProjectPieChart(
