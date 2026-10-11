@@ -670,23 +670,28 @@ double get progress =>
         sessionType: 'focus',
         taskId: _currentTaskId,
       );
+      // Snapshot the task id BEFORE the await below: the user can act while the
+      // Hive write is in flight, and re-reading _currentTaskId afterwards
+      // could attribute the pomodoro to a task picked in between.
+      final taskIdForSession = _currentTaskId;
+      final wasSkippedForSession = _wasSkipped;
       // Awaited so a session is never lost if the process is killed right
       // after the timer ends.
       await DatabaseService.addSession(session);
-      if (!_wasSkipped) {
+      if (!wasSkippedForSession) {
         _lastCompletedSessionId = session.id;
         _checkProjectCompletion();
       }
 
-      if (!_wasSkipped && _currentTaskId != null) {
-        final task = DatabaseService.getTaskById(_currentTaskId!);
+      if (!wasSkippedForSession && taskIdForSession != null) {
+        final task = DatabaseService.getTaskById(taskIdForSession);
         if (task != null) {
           task.completedPomodoros++;
           await DatabaseService.updateTask(task);
         }
       }
 
-      if (!_wasSkipped) {
+      if (!wasSkippedForSession) {
         if (!showNotification) {
           // Session ended while the app was closed/backgrounded (restore
           // path). Start the continuous vibration now so the user feels it
