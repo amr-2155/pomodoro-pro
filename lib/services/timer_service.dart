@@ -707,6 +707,7 @@ double get progress =>
           completionQuote: _completionQuote,
           completionQuoteSource: _completionQuoteSource,
           durationMinutes: _totalSeconds ~/ 60,
+          actualMinutes: actualElapsed ~/ 60,
           projectId: _currentProjectId,
           projectName: projectName,
         );

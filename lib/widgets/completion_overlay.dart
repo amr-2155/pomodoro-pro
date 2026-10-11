@@ -73,6 +73,7 @@ class _CompletionOverlayState extends State<CompletionOverlay> {
             quoteSource: (data['completionQuoteSource'] as String?) ?? '',
             modeLabel: _modeLabel(context, data['completedMode'] as String?),
             durationMinutes: (data['durationMinutes'] as int?) ?? 0,
+            actualMinutes: data['actualMinutes'] as int?,
             projectName: data['projectName'] as String?,
             sessionId: data['sessionId'] as String?,
             onDismiss: _onDismiss,

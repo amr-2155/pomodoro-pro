@@ -8,6 +8,43 @@ import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../l10n/app_localizations.dart';
 
+/// Result of comparing planned vs actual session time.
+class SessionReflection {
+  final int plannedMinutes;
+  final int actualMinutes;
+  final int deltaMinutes;
+  final bool ranLong;
+  final bool ranFullLength;
+
+  const SessionReflection({
+    required this.plannedMinutes,
+    required this.actualMinutes,
+    required this.deltaMinutes,
+    required this.ranLong,
+    required this.ranFullLength,
+  });
+
+  /// Returns null when there is nothing worth telling the user: unknown
+  /// actual time, or a difference too small to be a real signal (<1 minute
+  /// AND <4% of the planned length).
+  static SessionReflection? compare({
+    required int plannedMinutes,
+    required int? actualMinutes,
+  }) {
+    if (actualMinutes == null || plannedMinutes <= 0) return null;
+    final delta = actualMinutes - plannedMinutes;
+    if (delta.abs() < 1 && (delta.abs() / plannedMinutes) < 0.04) return null;
+    final abs = delta.abs();
+    return SessionReflection(
+      plannedMinutes: plannedMinutes,
+      actualMinutes: actualMinutes,
+      deltaMinutes: delta,
+      ranLong: delta > 0,
+      ranFullLength: delta > 0 && abs >= plannedMinutes,
+    );
+  }
+}
+
 class CompletionCelebration extends StatefulWidget {
   final int sessionCount;
   final bool isMilestone;
@@ -15,6 +52,9 @@ class CompletionCelebration extends StatefulWidget {
   final String quoteSource;
   final String modeLabel;
   final int durationMinutes;
+  /// Real elapsed minutes, when known. Used for the planned-vs-actual
+  /// reflection; null (e.g. a restored session) hides the comparison.
+  final int? actualMinutes;
   final VoidCallback onDismiss;
   final String? projectName;
   final String? sessionId;
@@ -27,6 +67,7 @@ class CompletionCelebration extends StatefulWidget {
     this.quoteSource = '',
     required this.modeLabel,
     required this.durationMinutes,
+    this.actualMinutes,
     required this.onDismiss,
     this.projectName,
     this.sessionId,
@@ -242,6 +283,7 @@ class _CompletionCelebrationState extends State<CompletionCelebration>
                                 _buildQuoteCard(isDark),
                                 const SizedBox(height: 14),
                                 _buildStatsRow(l10n),
+                                _buildReflection(l10n),
                                 const SizedBox(height: 14),
                                 _buildRatingSection(isDark, l10n),
                                 const SizedBox(height: 18),
@@ -405,6 +447,66 @@ class _CompletionCelebrationState extends State<CompletionCelebration>
           color: AppColors.success,
         ),
       ],
+    );
+  }
+
+  /// "How long did it really take?" — planned vs actual, with a plain
+  /// verdict. Only rendered for focus sessions with a known elapsed time.
+  Widget _buildReflection(AppLocalizations l10n) {
+    final r = SessionReflection.compare(
+      plannedMinutes: widget.durationMinutes,
+      actualMinutes: widget.actualMinutes,
+    );
+    if (r == null) return const SizedBox.shrink();
+
+    final actual = r.actualMinutes;
+    final planned = r.plannedMinutes;
+    final accent = r.ranLong ? AppColors.warning : AppColors.success;
+    final abs = r.deltaMinutes.abs();
+    final verdict = r.ranLong
+        ? (r.ranFullLength ? 'أكملت الجلسة كاملة — عمل رائع ⭐'
+            : 'استغرقت أطول بـ ${fmtMin(abs)} من الخطة')
+        : 'أنهيت قبل الخطة بـ ${fmtMin(abs)} — أسرع 🚀';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            r.ranLong ? Icons.hourglass_bottom_rounded : Icons.bolt_rounded,
+            size: 20,
+            color: accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'الوقت الفعلي: ${fmtMin(actual)} من أصل ${fmtMin(planned)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  verdict,
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -69,12 +69,12 @@ class SessionManager extends ChangeNotifier {
     required String completionQuote,
     required String completionQuoteSource,
     required int durationMinutes,
+    int? actualMinutes,
     String? projectId,
     String? projectName,
   }) {
     if (sessionId == _lastCompletedSessionId && _completionPending) {
       DebugLogger.log('SM-COMPLETE', 'DUPLICATE ignored: sessionId=$sessionId');
-      print('COMPLETE|SM markCompleted DUPLICATE ignored sessionId=$sessionId');
       return;
     }
     _completionData = {
@@ -85,6 +85,8 @@ class SessionManager extends ChangeNotifier {
       'completionQuote': completionQuote,
       'completionQuoteSource': completionQuoteSource,
       'durationMinutes': durationMinutes,
+      // Real elapsed time, so the card can show planned vs actual.
+      'actualMinutes': actualMinutes,
       'projectId': projectId,
       'projectName': projectName,
     };
@@ -92,8 +94,6 @@ class SessionManager extends ChangeNotifier {
     _lastCompletedSessionId = sessionId;
     _persist();
     DebugLogger.log('SM-COMPLETE', 'SET: sessionId=$sessionId, project=$projectName');
-    print('COMPLETE|SM markCompleted SET sessionId=$sessionId '
-        'mode=$completedMode project=$projectName');
     notifyListeners();
   }
 
