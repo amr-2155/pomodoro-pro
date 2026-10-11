@@ -19,10 +19,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   String _chartView = 'week';
   String? _filterProjectId;
 
+  /// Max distinct slices drawn in the project pie chart. The legend renders
+  /// every slice, so this is a single constant rather than a second magic
+  /// number that could drift out of sync with the chart.
+  static const int _pieMaxSlices = 6;
+
   AppLocalizations get l10n => AppLocalizations.of(context);
 
+  /// Uses the same predicate as every unfiltered aggregate
+  /// (`DatabaseService._isTimerSession`): filtering on `completed` alone
+  /// counted tasbeeh rounds, which made a *filtered* total jump **up** relative
+  /// to the same figure unfiltered — backwards for a filter.
   List<Session> _filteredSessions({String? projectId, DateTime? since}) {
-    var sessions = DatabaseService.getAllSessions().where((s) => s.completed);
+    var sessions = DatabaseService.getAllSessions().where(
+        (s) => s.completed && s.sessionType != 'tasbeeh');
     if (projectId != null) sessions = sessions.where((s) => s.projectId == projectId);
     if (since != null) sessions = sessions.where((s) => !s.date.isBefore(since));
     return sessions.toList();
@@ -65,16 +75,25 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final now = DateTime.now();
     final lastMonth = DateTime(now.year, now.month - 1, 1);
     return DatabaseService.getAllSessions()
-        .where((s) => s.completed && s.date.year == lastMonth.year && s.date.month == lastMonth.month)
+        .where((s) =>
+            s.completed &&
+            s.sessionType != 'tasbeeh' &&
+            s.date.year == lastMonth.year &&
+            s.date.month == lastMonth.month)
         .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
   int _getLastWeekMinutes() {
     final now = DateTime.now();
-    final thisWeekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
-    final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+    final today = DateTime(now.year, now.month, now.day);
+    final thisWeekStart = DateTime(today.year, today.month, today.day - ((today.weekday + 1) % 7));
+    final lastWeekStart = DateTime(thisWeekStart.year, thisWeekStart.month, thisWeekStart.day - 7);
     return DatabaseService.getAllSessions()
-        .where((s) => s.completed && !s.date.isBefore(lastWeekStart) && s.date.isBefore(thisWeekStart))
+        .where((s) =>
+            s.completed &&
+            s.sessionType != 'tasbeeh' &&
+            !s.date.isBefore(lastWeekStart) &&
+            s.date.isBefore(thisWeekStart))
         .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
   }
 
@@ -734,7 +753,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   Widget _buildProjectPieChart(
       List<Map<String, dynamic>> breakdown, bool isDark) {
-    final totalMinutes = breakdown.fold<int>(0, (sum, p) => sum + (p['minutes'] as int));
+    // Only the top slices are drawn. Percentages must be relative to what is
+    // actually drawn, otherwise the labels summed to (say) 73% while the ring
+    // read 100%. Anything beyond the cap is folded into one "Other" slice so
+    // the whole total stays visible instead of silently vanishing.
+    final top = breakdown.take(_pieMaxSlices).toList();
+    final restMinutes = breakdown
+        .skip(_pieMaxSlices)
+        .fold<int>(0, (sum, p) => sum + (p['minutes'] as int));
+    final slices = <Map<String, dynamic>>[...top];
+    if (restMinutes > 0) {
+      slices.add({
+        'name': l10n.other,
+        'icon': '•',
+        'minutes': restMinutes,
+        'color': Colors.grey,
+      });
+    }
+    final totalMinutes = slices.fold<int>(0, (sum, p) => sum + (p['minutes'] as int));
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -783,7 +819,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     PieChartData(
                       sectionsSpace: 2,
                       centerSpaceRadius: 36,
-                      sections: breakdown.take(6).map((p) {
+                      sections: slices.map((p) {
                         final minutes = p['minutes'] as int;
                         final percent =
                             totalMinutes > 0 ? minutes / totalMinutes : 0.0;
@@ -806,7 +842,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: breakdown.take(4).map((p) {
+                  children: slices.map((p) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
@@ -911,7 +947,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         : 0;
     final bestDay = dailyData.isEmpty ? 0 : dailyData.reduce((a, b) => a > b ? a : b);
     final weekTotal = dailyData.fold(0, (sum, m) => sum + m);
-    final daysSoFar = DateTime.now().weekday;
+    // The week starts on Saturday, so "days elapsed" must count from Saturday
+    // too. The ISO `weekday` index reported 6 on a Saturday when only one day
+    // had elapsed, dividing the average by ~6.
+    final daysSinceSaturday = (DateTime.now().weekday + 1) % 7;
+    final daysSoFar = daysSinceSaturday + 1;
     final dailyAvg = daysSoFar > 0 ? (weekTotal / daysSoFar).round() : 0;
     final maxY = dailyData.isEmpty
         ? 60.0
@@ -1288,26 +1328,47 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   List<double> _getFilteredDailyMinutesThisWeek() {
-    final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     final dailyMinutes = List<double>.filled(7, 0);
+    final byDay = _minutesByCalendarDay(projectId: _filterProjectId);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek =
+        DateTime(today.year, today.month, today.day - ((today.weekday + 1) % 7));
     for (int i = 0; i < 7; i++) {
-      final day = startOfWeek.add(Duration(days: i));
-      final daySessions = _filteredSessions(projectId: _filterProjectId, since: day)
-          .where((s) => s.date.year == day.year && s.date.month == day.month && s.date.day == day.day);
-      dailyMinutes[i] = daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
+      final day = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day + i);
+      dailyMinutes[i] =
+          (byDay['${day.year}-${day.month}-${day.day}'] ?? 0).toDouble();
     }
     return dailyMinutes;
   }
 
+  /// Buckets filtered minutes by `year-month-day` in a single pass.
+  ///
+  /// The previous implementations called `_filteredSessions()` inside their
+  /// loop, and each of those calls copied the entire session table. The streak
+  /// calculation did that 365 times and the monthly chart up to 31 times —
+  /// every one of them inside `build()`, which froze the screen for seconds
+  /// once a few thousand sessions were stored.
+  Map<String, int> _minutesByCalendarDay({String? projectId}) {
+    final result = <String, int>{};
+    for (final s in _filteredSessions(projectId: projectId)) {
+      final d = s.date;
+      final key = '${d.year}-${d.month}-${d.day}';
+      result[key] =
+          (result[key] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
+    }
+    return result;
+  }
+
   int _getFilteredStreak() {
     int streak = 0;
+    final byDay = _minutesByCalendarDay(projectId: _filterProjectId);
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     for (int i = 0; i < 365; i++) {
-      final day = now.subtract(Duration(days: i));
-      final daySessions = _filteredSessions(projectId: _filterProjectId)
-          .where((s) => s.date.year == day.year && s.date.month == day.month && s.date.day == day.day);
-      if (daySessions.isNotEmpty) {
+      final day = DateTime(today.year, today.month, today.day - i);
+      final hasWork = (byDay['${day.year}-${day.month}-${day.day}'] ?? 0) > 0;
+      if (hasWork) {
         streak++;
       } else if (i > 0) {
         break;
@@ -1328,7 +1389,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   List<Map<String, dynamic>> _getFilteredProjectBreakdown() {
     final sessions = _filteredSessions(projectId: _filterProjectId);
     final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
+    final today = DateTime(now.year, now.month, now.day);
+    final startOfWeek =
+        DateTime(today.year, today.month, today.day - ((today.weekday + 1) % 7));
     final weekSessions = sessions.where((s) => !s.date.isBefore(startOfWeek));
     final map = <String, int>{};
     for (final s in weekSessions) {
@@ -1354,12 +1417,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final now = DateTime.now();
     final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
     final weeklyMinutes = List<double>.filled(4, 0);
+    // Single bucketed pass instead of one full table copy per day of the month.
+    final byDay = _minutesByCalendarDay(projectId: _filterProjectId);
     for (int d = 1; d <= daysInMonth; d++) {
-      final day = DateTime(now.year, now.month, d);
-      var daySessions = DatabaseService.getSessionsForDate(day).where((s) => s.completed);
-      if (_filterProjectId != null) daySessions = daySessions.where((s) => s.projectId == _filterProjectId);
       final weekIndex = ((d - 1) ~/ 7).clamp(0, 3);
-      weeklyMinutes[weekIndex] += daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
+      weeklyMinutes[weekIndex] +=
+          (byDay['${now.year}-${now.month}-$d'] ?? 0).toDouble();
     }
     // RTL: reverse so most recent week (W4) is on the right.
     return List<double>.from(weeklyMinutes.reversed);

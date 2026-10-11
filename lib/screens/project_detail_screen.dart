@@ -173,6 +173,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             onPressed: () {
               final timer = context.read<TimerService>();
               timer.setProject(_project.id);
+              // Apply the project's default duration and force focus mode.
+              // Without this the timer kept whatever the previous session left
+              // behind — starting a "focus" session on a 60-minute project
+              // could run a 5-minute break labelled as focus, and a stopwatch
+              // mode would start a stopwatch instead.
+              timer.setDurationSeconds(TimerMode.focus, _project.defaultDuration);
               timer.start();
               Navigator.pop(context);
             },

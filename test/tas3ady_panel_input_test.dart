@@ -10,7 +10,8 @@ import 'package:pomodoro_app/widgets/tas3ady_panel.dart';
 void main() {
   Future<void> pumpPanel(WidgetTester tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {});
+        .setMockMethodCallHandler(SystemChannels.platform,
+            (MethodCall call) async => null);
     // Phone-like viewport so the bottom sheet fully fits on screen.
     tester.view.physicalSize = const Size(1080, 1920);
     tester.view.devicePixelRatio = 1.0;

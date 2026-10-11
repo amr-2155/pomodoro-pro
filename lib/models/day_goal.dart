@@ -25,6 +25,41 @@ class DayGoal extends HiveObject {
     List<StageItem>? stages,
     this.manuallyCompletedMinutes = 0,
   }) : stages = stages ?? [];
+
+  Map<String, dynamic> toMap() {
+    return {
+      'dateKey': dateKey,
+      'goalMinutes': goalMinutes,
+      'carryOverMinutes': carryOverMinutes,
+      'stages': stages.map((s) => s.toMap()).toList(),
+      'manuallyCompletedMinutes': manuallyCompletedMinutes,
+    };
+  }
+
+  factory DayGoal.fromMap(Map<String, dynamic> map) {
+    final rawStages = map['stages'];
+    final stages = <StageItem>[];
+    if (rawStages is List) {
+      for (final item in rawStages) {
+        if (item is Map) {
+          try {
+            stages.add(
+                StageItem.fromMap(Map<String, dynamic>.from(item)));
+          } catch (_) {
+            // Skip an unreadable stage rather than losing the whole day goal.
+          }
+        }
+      }
+    }
+    return DayGoal(
+      dateKey: map['dateKey'] ?? '',
+      goalMinutes: (map['goalMinutes'] as num?)?.toInt() ?? 0,
+      carryOverMinutes: (map['carryOverMinutes'] as num?)?.toInt() ?? 0,
+      stages: stages,
+      manuallyCompletedMinutes:
+          (map['manuallyCompletedMinutes'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class DayGoalAdapter extends TypeAdapter<DayGoal> {

@@ -55,9 +55,17 @@ class _TasksScreenState extends State<TasksScreen>
     _checkAllDone();
   }
 
+  /// Fires once per visit. The previous version ran on every `_loadTasks()`,
+  /// so opening the app with an already-completed list replayed the confetti,
+  /// and the `.then` cleared the controller without a `setState` — leaving the
+  /// AnimatedBuilder painting its final frame forever.
+  bool _celebratedThisVisit = false;
+
   void _checkAllDone() {
+    if (_celebratedThisVisit) return;
     final active = _tasks.where((t) => !t.isDone).toList();
-    if (active.isEmpty && _tasks.isNotEmpty && _confettiController == null) {
+    if (active.isEmpty && _tasks.isNotEmpty) {
+      _celebratedThisVisit = true;
       _showConfetti();
     }
   }
@@ -66,10 +74,16 @@ class _TasksScreenState extends State<TasksScreen>
     _confettiController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
-    )..forward().then((_) {
+    );
+    _confettiController!.forward().then((_) {
+      if (!mounted) return;
+      // setState is required: without it the AnimatedBuilder keeps painting
+      // the last frame of the animation.
+      setState(() {
         _confettiController?.dispose();
         _confettiController = null;
       });
+    });
   }
 
   void _addTask() {
@@ -251,6 +265,16 @@ class _TasksScreenState extends State<TasksScreen>
           .toList();
     }
     switch (_sortBy) {
+      case 'manual':
+        // Tasks never dragged keep sortOrder -1 and fall back to the end,
+        // keeping their relative creation order.
+        tasks.sort((a, b) {
+          final ao = a.sortOrder < 0 ? 1 << 30 : a.sortOrder;
+          final bo = b.sortOrder < 0 ? 1 << 30 : b.sortOrder;
+          if (ao != bo) return ao.compareTo(bo);
+          return a.createdAt.compareTo(b.createdAt);
+        });
+        break;
       case 'priority':
         tasks.sort((a, b) => b.priority.compareTo(a.priority));
         break;
@@ -609,7 +633,10 @@ class _TasksScreenState extends State<TasksScreen>
           const SizedBox(width: 4),
           _sortChip('A-Z', 'alpha', isDark),
           const Spacer(),
-          if (activeCount > 1)
+          // Always shown while reorder mode is active. Previously this was
+          // gated on `activeCount > 1`, so completing a task down to one
+          // active task hid the only control that could leave reorder mode.
+          if (activeCount > 1 || _reorderMode)
             GestureDetector(
               onTap: () => setState(() => _reorderMode = !_reorderMode),
               child: Container(
@@ -745,13 +772,25 @@ class _TasksScreenState extends State<TasksScreen>
     return ReorderableListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
       itemCount: activeTasks.length,
-      // ignore: deprecated_member_use
       onReorder: (oldIndex, newIndex) {
+        // The old code did `_filteredActiveTasks.removeAt(...)` on a *getter*,
+        // which rebuilds a brand-new list on every access — so the drag was
+        // applied to a throw-away copy and silently discarded on the next
+        // build. Write the new order onto the tasks themselves instead, then
+        // switch the sort so nothing re-sorts them behind the user's back.
+        if (newIndex > oldIndex) newIndex--;
+        final reordered = [...activeTasks];
+        final item = reordered.removeAt(oldIndex);
+        reordered.insert(newIndex, item);
         setState(() {
-          if (newIndex > oldIndex) newIndex--;
-          final item = _filteredActiveTasks.removeAt(oldIndex);
-          _filteredActiveTasks.insert(newIndex, item);
+          _sortBy = 'manual';
+          for (var i = 0; i < reordered.length; i++) {
+            reordered[i].sortOrder = i;
+          }
         });
+        for (final task in reordered) {
+          DatabaseService.updateTask(task);
+        }
       },
       itemBuilder: (context, index) {
         final task = activeTasks[index];
@@ -1465,7 +1504,9 @@ class _TasksScreenState extends State<TasksScreen>
     int priority = task.priority;
     int estimated = task.estimatedPomodoros;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    // The sheet's TextFields listen to these controllers, so they must stay
+    // alive for the whole dismiss animation — release them only once the
+    // route has actually closed, via the future returned below.
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1713,7 +1754,12 @@ class _TasksScreenState extends State<TasksScreen>
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // Safe now: the route (and with it every TextField still listening to
+      // these controllers) has been removed from the tree.
+      titleController.dispose();
+      descController.dispose();
+    });
   }
 }
 

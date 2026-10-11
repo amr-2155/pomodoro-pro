@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 import 'dart:js_interop';
 import 'completion_sound.dart';
+import 'database_service.dart';
 import 'vibration_service.dart';
 
 class AudioService {
@@ -71,9 +72,9 @@ class AudioService {
   }
 
   static Future<void> playCompletionSound([CompletionSoundType? type]) async {
+    if (type == null) return;
     await _stopElement(_completionElement);
-    final sound = type ?? completionSoundFromKey('soft_bell');
-    final url = await _getUrl(sound.asset);
+    final url = await _getUrl(type.asset);
     if (url == null) return;
     _completionElement = web.HTMLAudioElement()
       ..src = url
@@ -81,12 +82,20 @@ class AudioService {
     await _completionElement!.play().toDart;
   }
 
+  /// [type] is null when the user disabled the completion sound in Settings —
+  /// silence in that case, never a fallback to a default tone.
   static Future<void> startCompletionLoop([CompletionSoundType? type]) async {
-    _completionLooping = true;
+    if (type == null) {
+      _completionLooping = false;
+      _vibrationTimer?.cancel();
+      _vibrationTimer = null;
+      await _stopElement(_completionElement);
+      return;
+    }
     await _stopElement(_completionElement);
-    final sound = type ?? completionSoundFromKey('soft_bell');
-    final url = await _getUrl(sound.asset);
+    final url = await _getUrl(type.asset);
     if (url == null) return;
+    _completionLooping = true;
     _completionElement = web.HTMLAudioElement()
       ..src = url
       ..volume = 0.9
@@ -103,8 +112,15 @@ class AudioService {
   }
 
   /// Vibration-only alert (no sound): repeats until [stopCompletionLoop].
-  /// Mirrors the mobile implementation for the restore path.
+  /// Mirrors the mobile implementation for the restore path, including the
+  /// `completionVibrationEnabled` setting check.
   static Future<void> startVibrationOnly() async {
+    if (!DatabaseService.completionVibrationEnabled) {
+      _completionLooping = false;
+      _vibrationTimer?.cancel();
+      _vibrationTimer = null;
+      return;
+    }
     _completionLooping = true;
     _vibrationTimer?.cancel();
     try {

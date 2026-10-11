@@ -398,7 +398,10 @@ class _CompletionCelebrationState extends State<CompletionCelebration>
         const SizedBox(width: 12),
         _buildStatChip(
           icon: Icons.bolt,
-          label: '${l10n.total}: ${fmtMin(widget.sessionCount * widget.durationMinutes)}',
+          // Was `sessionCount * durationMinutes`, which multiplied *today's*
+          // session count by *this* session's length. Any variation in session
+          // length made the "total" wrong — read the real figure instead.
+          label: '${l10n.total}: ${fmtMin(DatabaseService.getTodayMinutes())}',
           color: AppColors.success,
         ),
       ],

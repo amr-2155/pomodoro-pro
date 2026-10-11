@@ -1,3 +1,4 @@
+import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
@@ -21,10 +22,11 @@ class NotificationService {
   static Future<void> requestPermission() async {
     if (!kIsWeb) return;
     try {
-      web.Notification.requestPermission();
-      if (web.Notification.permission == 'granted') {
-        _hasPermission = true;
-      }
+      // requestPermission() returns a Promise; reading the state on the very
+      // next line would always sample the pre-grant value. Await it instead.
+      final result = await web.Notification.requestPermission().toDart;
+      _hasPermission = (result == 'granted') ||
+          (web.Notification.permission == 'granted');
     } catch (_) {}
   }
 
@@ -49,9 +51,9 @@ class NotificationService {
     } catch (_) {}
   }
 
-  static Future<void> cancelAll() async {
-    if (kIsWeb) return;
-  }
+  /// No-op on web: browser notifications cannot be cancelled programmatically.
+/// (The previous `if (kIsWeb) return;` guard made this permanently unreachable.)
+  static Future<void> cancelAll() async {}
 
   static Future<bool> scheduleAt(
     DateTime when, {

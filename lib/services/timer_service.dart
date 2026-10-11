@@ -280,7 +280,7 @@ double get progress =>
     _mode = modeIdx is int && modeIdx >= 0 && modeIdx < TimerMode.values.length
         ? TimerMode.values[modeIdx]
         : TimerMode.focus;
-    print('RESTORE| mode=${_mode.name} active=true endMs=$endMs');
+    DebugLogger.log('RESTORE', 'mode=${_mode.name} active=true endMs=$endMs');
     _totalSeconds =
         DatabaseService.getSetting(_cdTotalSec, defaultValue: _totalSeconds)
             as int;
@@ -329,13 +329,12 @@ double get progress =>
       });
     } else {
       // Session already ended while the app was closed/backgrounded.
-      DebugLogger.log('RESTORE', 'session already ended, calling _completeSession(false)');
-      print('RESTORE| already ended, completing mode=${_mode.name}');
+      DebugLogger.log('RESTORE', 'session already ended, completing mode=${_mode.name}');
       _seconds = 0;
       _running = false;
       _endTime = null;
       _completing = true;
-      _completeSession(showNotification: false);
+      await _completeSession(showNotification: false);
       DebugLogger.log('RESTORE', 'AFTER _completeSession');
       notifyListeners();
     }
@@ -364,7 +363,7 @@ double get progress =>
       notifyListeners();
       return;
     }
-_timer?.cancel();
+    _timer?.cancel();
     _running = false;
     _endTime = null;
     _endNotificationScheduled = false;
@@ -374,7 +373,6 @@ _timer?.cancel();
     unawaited(BackgroundTaskService.stop());
     AudioService.stopAllSounds();
     notifyListeners();
-    return;
   }
 
   void reset() {
@@ -447,7 +445,8 @@ _timer?.cancel();
     unawaited(BackgroundTaskService.stop());
     _wasSkipped = true;
     _completing = true;
-    _completeSession(showNotification: false);
+    // A skipped session still records elapsed time, so keep it durable.
+    unawaited(_completeSession(showNotification: false));
   }
 
   void setMode(TimerMode mode) {
@@ -523,7 +522,8 @@ _timer?.cancel();
       taskId: _currentTaskId,
     );
     _stopwatchStartedAt = null;
-    DatabaseService.addSession(session);
+    // Keep the stopwatch session durable like every other session type.
+    unawaited(DatabaseService.addSession(session));
     _lastCompletedSessionId = session.id;
     final projectName = _currentProjectId != null
         ? DatabaseService.getProject(_currentProjectId!)?.name
@@ -594,17 +594,18 @@ _timer?.cancel();
 
   void _finish() {
     DebugLogger.log('FINISH', '_completing=$_completing, _mode=$_mode');
-    print('COMPLETE|_finish entering completing=$_completing mode=$_mode');
     if (_completing) return; // dedupe: one completion per session
     _completing = true;
-    _completeSession(showNotification: true);
+    unawaited(_completeSession(showNotification: true));
   }
 
   /// Single completion path for a countdown session. [showNotification] is
   /// false only for Skip — an intentionally-ended session never notifies.
-  void _completeSession({required bool showNotification}) {
-    print('COMPLETE|_completeSession showNotification=$showNotification '
-        'skipped=$_wasSkipped mode=$_mode');
+  ///
+  /// The session/task Hive writes are awaited so a session can never be
+  /// lost if the process is killed moments after completion. Callers use
+  /// `unawaited()` so the completion UI still renders instantly.
+  Future<void> _completeSession({required bool showNotification}) async {
     _timer?.cancel();
     _running = false;
     // Always cancel any still-pending OS-scheduled notification: on
@@ -637,9 +638,14 @@ _timer?.cancel();
 
     if (_mode == TimerMode.focus) {
       _completedMode = _mode;
-      _sessionCount++;
-      DatabaseService.setSetting('sessionCount', _sessionCount);
-      _isMilestone = _sessionCount % DatabaseService.longBreakInterval == 0;
+      // A skipped session never counts toward the pomodoro cycle: incrementing
+      // here permanently advanced the counter, could flag a bogus milestone
+      // and forced a long break the user never earned.
+      if (!_wasSkipped) {
+        _sessionCount++;
+        DatabaseService.setSetting('sessionCount', _sessionCount);
+        _isMilestone = _sessionCount % DatabaseService.longBreakInterval == 0;
+      }
       final projectName = _currentProjectId != null
           ? DatabaseService.getProject(_currentProjectId!)?.name
           : null;
@@ -664,7 +670,9 @@ _timer?.cancel();
         sessionType: 'focus',
         taskId: _currentTaskId,
       );
-      DatabaseService.addSession(session);
+      // Awaited so a session is never lost if the process is killed right
+      // after the timer ends.
+      await DatabaseService.addSession(session);
       if (!_wasSkipped) {
         _lastCompletedSessionId = session.id;
         _checkProjectCompletion();
@@ -674,7 +682,7 @@ _timer?.cancel();
         final task = DatabaseService.getTaskById(_currentTaskId!);
         if (task != null) {
           task.completedPomodoros++;
-          DatabaseService.updateTask(task);
+          await DatabaseService.updateTask(task);
         }
       }
 
@@ -683,11 +691,9 @@ _timer?.cancel();
           // Session ended while the app was closed/backgrounded (restore
           // path). Start the continuous vibration now so the user feels it
           // as soon as they reopen the app, until they dismiss the card.
-          print('COMPLETE|restore starting background vibration');
           AudioService.startVibrationOnly();
         }
-        print('COMPLETE|focus markCompleted session=${session.id} '
-            'project=${_currentProjectId}');
+        DebugLogger.log('COMPLETE', 'focus markCompleted session=${session.id}');
         _sessionManager.markCompleted(
           sessionId: session.id,
           completedMode: _completedMode.name,
@@ -700,7 +706,7 @@ _timer?.cancel();
           projectName: projectName,
         );
       } else {
-        print('COMPLETE|skip acknowledged - no completion card');
+        DebugLogger.log('COMPLETE', 'skip acknowledged - no completion card');
       }
     } else if (_mode == TimerMode.shortBreak ||
         _mode == TimerMode.longBreak) {
@@ -712,7 +718,6 @@ _timer?.cancel();
         if (!showNotification) {
           // Break finished while the app was closed/backgrounded (restore
           // path). Start continuous vibration until the user dismisses.
-          print('COMPLETE|restore starting background vibration (break)');
           AudioService.startVibrationOnly();
         }
         final quote = QuoteLibrary.getCompletionQuote(
@@ -720,7 +725,7 @@ _timer?.cancel();
           isMilestone: false,
           projectName: null,
         );
-        print('COMPLETE|break markCompleted mode=${_mode.name}');
+        DebugLogger.log('COMPLETE', 'break markCompleted mode=${_mode.name}');
         _sessionManager.markCompleted(
           sessionId: const Uuid().v4(),
           completedMode: _mode.name,
@@ -731,7 +736,7 @@ _timer?.cancel();
           durationMinutes: _totalSeconds ~/ 60,
         );
       } else {
-        print('COMPLETE|skip acknowledged - no completion card');
+        DebugLogger.log('COMPLETE', 'skip acknowledged - no completion card');
       }
     }
 

@@ -32,6 +32,30 @@ class StageItem extends HiveObject {
     this.projectId,
     this.order = 0,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'icon': icon,
+      'durationMinutes': durationMinutes,
+      'completed': completed,
+      'projectId': projectId,
+      'order': order,
+    };
+  }
+
+  factory StageItem.fromMap(Map<String, dynamic> map) {
+    return StageItem(
+      id: map['id'] ?? '',
+      title: map['title'] ?? '',
+      icon: map['icon'] ?? '📌',
+      durationMinutes: (map['durationMinutes'] as num?)?.toInt() ?? 25,
+      completed: map['completed'] == true,
+      projectId: map['projectId'],
+      order: (map['order'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class StageItemAdapter extends TypeAdapter<StageItem> {

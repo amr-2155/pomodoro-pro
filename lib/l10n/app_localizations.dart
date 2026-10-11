@@ -311,6 +311,7 @@ class AppLocalizations {
   String get todayTasks => _t({'ar': 'مهام اليوم', 'en': "Today's Tasks"});
   String get searchTasks => _t({'ar': 'بحث في المهام...', 'en': 'Search tasks...'});
   String get all => _t({'ar': 'الكل', 'en': 'All'});
+  String get other => _t({'ar': 'أخرى', 'en': 'Other'});
   String get sort => _t({'ar': 'ترتيب:', 'en': 'Sort:'});
   String get priority => _t({'ar': 'الأولوية', 'en': 'Priority'});
   String get date => _t({'ar': 'التاريخ', 'en': 'Date'});

@@ -699,27 +699,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return field;
   }
 
-  void _confirmReset(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  void _confirmReset(BuildContext outerContext) {
+    final l10n = AppLocalizations.of(outerContext);
+    final isDark = Theme.of(outerContext).brightness == Brightness.dark;
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: outerContext,
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(l10n.resetConfirmTitle),
         content: Text(l10n.resetConfirmDesc),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(l10n.cancel)),
           FilledButton(
-            onPressed: () {
-              final timerService = context.read<TimerService>();
+            onPressed: () async {
+              final timerService = outerContext.read<TimerService>();
               timerService.reset();
               timerService.resetSessionCount();
               timerService.setProject(null);
-              DatabaseService.deleteAllData();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              // Close the dialog and capture its result before touching any
+              // further navigation: after pop(dialogContext) that element is
+              // deactivated and any ancestor lookup on it would throw.
+              Navigator.pop(dialogContext);
+              final messenger = ScaffoldMessenger.of(outerContext);
+              await DatabaseService.deleteAllData();
+              messenger.showSnackBar(
                 SnackBar(content: Text(l10n.dataReset), backgroundColor: AppColors.error,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

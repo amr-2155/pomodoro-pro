@@ -642,7 +642,15 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
               ),
             ),
             InkWell(
-              onTap: _hasMeasurement ? null : () => _speedCtrl.text = '3',
+              // Every other keypad path goes through _onChanged(), which
+              // calls setState. Setting the controller text directly left the
+              // result box rendering the previous, stale estimate.
+              onTap: _hasMeasurement
+                  ? null
+                  : () {
+                      _speedCtrl.text = '3';
+                      _onChanged();
+                    },
               child: Text(
                 'الافتراضية: 3',
                 style: TextStyle(

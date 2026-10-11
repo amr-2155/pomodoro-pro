@@ -46,9 +46,14 @@ class GoalsService extends ChangeNotifier {
       ? completedWeek / weeklyGoalMinutes
       : 0.0;
 
+  /// Days remaining in the current week. The app's week starts on **Saturday**
+  /// (see `DatabaseService.getSessionsForWeek`), so this must not use the ISO
+  /// `weekday` index — on a Friday that would report 2 days left when only
+  /// Saturday remains, halving the suggested daily target.
   int get daysLeftInWeek {
     final now = DateTime.now();
-    return (7 - now.weekday).clamp(1, 7);
+    final daysSinceSaturday = (now.weekday + 1) % 7;
+    return (7 - daysSinceSaturday).clamp(1, 7);
   }
 
   int get suggestedDailyFromWeekly {
@@ -59,15 +64,23 @@ class GoalsService extends ChangeNotifier {
     return perDay.clamp(0, 24 * 60);
   }
 
+  /// Unfinished minutes carried over from yesterday. Capped at one day of the
+  /// goal: without a cap the value feeds back into itself
+  /// (`goal + carryOver - completed`) and compounds 60 → 120 → 180, which makes
+  /// the daily ring permanently unreachable.
   int get carryOverFromYesterday {
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
     final key = DatabaseService.dateKeyOf(yesterday);
     final g = DatabaseService.getDayGoal(key);
     if (g == null) return 0;
     final completed =
         DatabaseService.getCompletedMinutesForDay(yesterday);
     final diff = g.goalMinutes + g.carryOverMinutes - completed;
-    return diff > 0 ? diff : 0;
+    if (diff <= 0) return 0;
+    final cap = g.goalMinutes > 0 ? g.goalMinutes : dailyGoalMinutes;
+    if (cap > 0 && diff > cap) return cap;
+    return diff;
   }
 
   List<StageItem> get todayStages => todayGoal.stages;
@@ -231,10 +244,15 @@ class GoalsService extends ChangeNotifier {
 
   void _scheduleDayRollover() {
     final now = DateTime.now();
-    final nextDay = DateTime(now.year, now.month, now.day)
-        .add(const Duration(days: 1));
+    // Calendar arithmetic, not `Duration(days: 1)`: 24 absolute hours across a
+    // DST fall-back lands at 23:00 on the *same* date, which would leave the
+    // goals ring showing yesterday's plan for a whole day.
+    final nextDay = DateTime(now.year, now.month, now.day + 1);
+    var delay = nextDay.difference(now) + const Duration(seconds: 5);
+    // Guard against a non-positive delay, which would spin the timer.
+    if (delay.isNegative) delay = const Duration(seconds: 5);
     _dayRolloverTimer = Timer(
-      nextDay.difference(now) + const Duration(seconds: 5),
+      delay,
       () {
         _ensureTodayGoal();
         notifyListeners();

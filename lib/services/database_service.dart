@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -148,6 +149,25 @@ class DatabaseService {
   }
 
   // Sessions
+  /// Calendar-day offset. `DateTime.add(Duration(days: n))` adds 24 absolute
+  /// hours, so across a DST fall-back midnight lands on 23:00 of the *same*
+  /// calendar date — which duplicated one day and skipped the next in every
+  /// weekly chart and the heat map. Building the date components directly is
+  /// always calendar-correct.
+  static DateTime _dayOffset(DateTime date, int days) =>
+      DateTime(date.year, date.month, date.day + days);
+
+  /// Today at midnight. Anchoring week maths here also normalises the
+  /// time-of-day, which `now.subtract(...)` never did.
+  static DateTime get _todayMidnight {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  /// Midnight of the current week. The week starts on **Saturday**.
+  static DateTime get _startOfWeekMidnight =>
+      _dayOffset(_todayMidnight, -((_todayMidnight.weekday + 1) % 7));
+
   static List<Session> getAllSessions() {
     return _sessions.values.toList();
   }
@@ -167,8 +187,7 @@ class DatabaseService {
   }
 
   static List<Session> getSessionsForWeek() {
-    final now = DateTime.now();
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
+    final startOfWeek = _startOfWeekMidnight;
     return _sessions.values.where((s) {
       return !s.date.isBefore(startOfWeek);
     }).toList();
@@ -181,29 +200,66 @@ class DatabaseService {
     }).toList();
   }
 
+  /// Serialises the read-modify-write of project counters so two sessions
+/// completing back-to-back cannot interleave `get -> ++ -> save` and lose an
+/// increment.
+  static Future<void> _counterQueue = Future<void>.value();
+
+  static Future<T> _withCounterLock<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    final previous = _counterQueue;
+    _counterQueue = () async {
+      try {
+        await previous;
+      } catch (_) {}
+      try {
+        completer.complete(await action());
+      } catch (error, stack) {
+        completer.completeError(error, stack);
+      }
+    }();
+    return completer.future;
+  }
+
   static Future<void> addSession(Session session) async {
     await _sessions.put(session.id, session);
 
-    final project = _projects.get(session.projectId);
-    if (project != null && session.completed) {
-      project.totalSessions++;
-      project.totalMinutes += (session.actualMinutes ?? session.durationMinutes);
-      await project.save();
+    // Use the same predicate as every read-side aggregate, otherwise tasbeeh
+    // and stopwatch rounds inflate the project counters that the detail screen
+    // (which filters them out) then disagrees with.
+    if (_isTimerSession(session)) {
+      await _withCounterLock(() async {
+        final project = _projects.get(session.projectId);
+        if (project != null) {
+          project.totalSessions++;
+          project.totalMinutes +=
+              (session.actualMinutes ?? session.durationMinutes);
+          await project.save();
+        }
+      });
     }
     goalsRevision.value++;
   }
 
   static Future<void> deleteSession(String id) async {
     final session = _sessions.get(id);
-    if (session != null) {
-      final project = _projects.get(session.projectId);
-      if (project != null && session.completed) {
-        project.totalSessions--;
-        project.totalMinutes -= (session.actualMinutes ?? session.durationMinutes);
-        await project.save();
-      }
-      await _sessions.delete(id);
+    if (session == null) return;
+    if (_isTimerSession(session)) {
+      await _withCounterLock(() async {
+        final project = _projects.get(session.projectId);
+        if (project != null) {
+          // Clamp: the counters can already be out of sync with the session
+          // set (e.g. after a backup restore), and must never go negative.
+          project.totalSessions = (project.totalSessions - 1).clamp(0, 1 << 30);
+          project.totalMinutes =
+              (project.totalMinutes - (session.actualMinutes ?? session.durationMinutes))
+                  .clamp(0, 1 << 31);
+          await project.save();
+        }
+      });
     }
+    await _sessions.delete(id);
+    goalsRevision.value++;
   }
 
   // Day Goals
@@ -284,11 +340,10 @@ class DatabaseService {
   }
 
   static List<int> getDailyCompletedMinutesThisWeek({bool onlyInWeeklyGoal = false}) {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
+    final startOfWeek = _startOfWeekMidnight;
     final list = <int>[];
     for (int i = 0; i < 7; i++) {
-      final day = startOfWeek.add(Duration(days: i));
+      final day = _dayOffset(startOfWeek, i);
       list.add(getCompletedMinutesForDay(day, onlyInWeeklyGoal: onlyInWeeklyGoal));
     }
     return list;
@@ -348,12 +403,11 @@ class DatabaseService {
   }
 
   static List<double> getDailyMinutesThisWeek() {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
+    final startOfWeek = _startOfWeekMidnight;
     final dailyMinutes = List<double>.filled(7, 0);
 
     for (int i = 0; i < 7; i++) {
-      final day = startOfWeek.add(Duration(days: i));
+      final day = _dayOffset(startOfWeek, i);
       final daySessions = getSessionsForDate(day).where(_isTimerSession);
       dailyMinutes[i] =
           daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
@@ -395,9 +449,9 @@ class DatabaseService {
 
   static int getProjectStreak(String projectId) {
     int streak = 0;
-    final now = DateTime.now();
+    final today = _todayMidnight;
     for (int i = 0; i < 365; i++) {
-      final day = now.subtract(Duration(days: i));
+      final day = _dayOffset(today, -i);
       final daySessions = getSessionsForDate(day)
           .where((s) => _isTimerSession(s) && s.projectId == projectId);
       if (daySessions.isNotEmpty) {
@@ -410,11 +464,10 @@ class DatabaseService {
   }
 
   static List<double> getProjectDailyMinutesThisWeek(String projectId) {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: (now.weekday + 1) % 7));
+    final startOfWeek = _startOfWeekMidnight;
     final dailyMinutes = List<double>.filled(7, 0);
     for (int i = 0; i < 7; i++) {
-      final day = startOfWeek.add(Duration(days: i));
+      final day = _dayOffset(startOfWeek, i);
       final daySessions = getSessionsForDate(day)
           .where((s) => _isTimerSession(s) && s.projectId == projectId);
       dailyMinutes[i] =
@@ -487,14 +540,14 @@ class DatabaseService {
   }
 
   static List<List<int>> getHeatMapData({int weeks = 16}) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final startDay = today.subtract(Duration(days: (today.weekday + 1) % 7 + (weeks - 1) * 7));
+    final today = _todayMidnight;
+    final startDay =
+        _dayOffset(today, -((today.weekday + 1) % 7 + (weeks - 1) * 7));
     final data = <List<int>>[];
     for (int w = 0; w < weeks; w++) {
       final week = <int>[];
       for (int d = 0; d < 7; d++) {
-        final day = startDay.add(Duration(days: w * 7 + d));
+        final day = _dayOffset(startDay, w * 7 + d);
         if (day.isAfter(today)) {
           week.add(-1);
         } else {
@@ -666,9 +719,20 @@ class DatabaseService {
     await _sessions.clear();
     await _projects.clear();
     await _tasks.clear();
+    // Daily goals, carry-over minutes and stage plans live in their own box.
+    // Leaving them behind meant a "reset" still showed the old goal rings.
+    await _dayGoals.clear();
     await _settings.clear();
     darkModeNotifier.value = false;
     zoomNotifier.value = 1.0;
+    // Reset the language notifier too: _settings.clear() deleted the
+    // 'language' key, so leaving this set would keep the old language on
+    // screen until relaunch and then silently revert.
+    localeNotifier.value = const Locale('ar');
+    quoteFavoritesNotifier.value = <String>{};
+    // GoalsService only listens to this notifier; without the bump the goal
+    // ring keeps rendering the pre-reset state until a manual refresh.
+    goalsRevision.value++;
   }
 
   static String createBackup() {
@@ -690,6 +754,9 @@ class DatabaseService {
         'actualSeconds': v.actualSeconds,
         'startTime': v.startTime?.toIso8601String(),
         'endTime': v.endTime?.toIso8601String(),
+        // Tasbeeh repetition count. Omitting it silently reset every
+        // tasbeeh total to zero after a backup round-trip.
+        'count': v.count,
       })),
       'tasks': _tasks.toMap().map((k, v) => MapEntry(k, {
         'id': v.id,
@@ -703,69 +770,160 @@ class DatabaseService {
         'description': v.description,
       })),
       'settings': _settings.toMap(),
+      'dayGoals': _dayGoals.toMap().map((k, v) => MapEntry(k, v.toMap())),
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
 
+  /// Restores a backup. Every record is parsed and validated *before* any
+  /// write, so a malformed field cannot leave the store half-overwritten.
+  /// Returns the number of restored records.
   static Future<int> restoreBackup(String jsonString) async {
-    final data = jsonDecode(jsonString) as Map<String, dynamic>;
-    int count = 0;
-
-    final projects = data['projects'] as Map<String, dynamic>? ?? {};
-    for (final entry in projects.entries) {
-      await _projects.put(entry.key, Project.fromMap(entry.value));
-      count++;
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(jsonString);
+    } on FormatException catch (e) {
+      throw FormatException('Backup file is not valid JSON: ${e.message}');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException(
+          'Backup file must contain a JSON object at the top level.');
     }
 
-    final sessions = data['sessions'] as Map<String, dynamic>? ?? {};
-    for (final entry in sessions.entries) {
-      final s = entry.value;
-      await _sessions.put(entry.key, Session(
-        id: s['id'] ?? entry.key,
-        projectId: s['projectId'] ?? '',
-        date: s['date'] != null ? DateTime.parse(s['date']) : DateTime.now(),
-        durationMinutes: s['durationMinutes'] ?? 0,
-        completed: s['completed'] ?? true,
-        sessionType: s['sessionType'] ?? 'focus',
-        rating: s['rating'],
-        notes: s['notes'],
-        taskId: s['taskId'],
-        actualMinutes: s['actualMinutes'],
-        actualSeconds: s['actualSeconds'],
-        startTime:
-            s['startTime'] != null ? DateTime.parse(s['startTime']) : null,
-        endTime: s['endTime'] != null ? DateTime.parse(s['endTime']) : null,
-      ));
-      count++;
+    final projectRecords = <MapEntry<String, Project>>[];
+    final projects = decoded['projects'];
+    if (projects is Map) {
+      for (final entry in projects.entries) {
+        if (entry.value is! Map) continue;
+        try {
+          projectRecords.add(MapEntry(
+            entry.key.toString(),
+            Project.fromMap(Map<String, dynamic>.from(entry.value as Map)),
+          ));
+        } catch (_) {
+          // Skip an unreadable project rather than aborting the restore.
+        }
+      }
     }
 
-    final tasks = data['tasks'] as Map<String, dynamic>? ?? {};
-    for (final entry in tasks.entries) {
-      final t = entry.value;
-      await _tasks.put(entry.key, Task(
-        id: t['id'] ?? entry.key,
-        title: t['title'] ?? '',
-        isDone: t['isDone'] ?? false,
-        createdAt: t['createdAt'] != null ? DateTime.parse(t['createdAt']) : DateTime.now(),
-        estimatedPomodoros: t['estimatedPomodoros'] ?? 1,
-        completedPomodoros: t['completedPomodoros'] ?? 0,
-        projectId: t['projectId'],
-        priority: t['priority'] ?? 0,
-        description: t['description'],
-      ));
-      count++;
+    final sessionRecords = <MapEntry<String, Session>>[];
+    final sessions = decoded['sessions'];
+    if (sessions is Map) {
+      for (final entry in sessions.entries) {
+        final s = entry.value;
+        if (s is! Map) continue;
+        try {
+          sessionRecords.add(MapEntry(
+            entry.key.toString(),
+            Session(
+              id: s['id'] ?? entry.key,
+              projectId: s['projectId'] ?? '',
+              date: s['date'] != null ? _parseLocal(s['date']) : DateTime.now(),
+              durationMinutes: (s['durationMinutes'] as num?)?.toInt() ?? 0,
+              completed: s['completed'] == true,
+              sessionType: s['sessionType'] ?? 'focus',
+              rating: (s['rating'] as num?)?.toInt(),
+              notes: s['notes'],
+              taskId: s['taskId'],
+              actualMinutes: (s['actualMinutes'] as num?)?.toInt(),
+              actualSeconds: (s['actualSeconds'] as num?)?.toInt(),
+              count: (s['count'] as num?)?.toInt(),
+              startTime:
+                  s['startTime'] != null ? _parseLocal(s['startTime']) : null,
+              endTime: s['endTime'] != null ? _parseLocal(s['endTime']) : null,
+            ),
+          ));
+        } catch (_) {
+          // Skip a malformed session instead of aborting the whole restore.
+        }
+      }
     }
 
-    final settings = data['settings'] as Map<String, dynamic>? ?? {};
-    for (final entry in settings.entries) {
-      await _settings.put(entry.key, entry.value);
-      count++;
+    final taskRecords = <MapEntry<String, Task>>[];
+    final tasks = decoded['tasks'];
+    if (tasks is Map) {
+      for (final entry in tasks.entries) {
+        final t = entry.value;
+        if (t is! Map) continue;
+        try {
+          taskRecords.add(MapEntry(
+            entry.key.toString(),
+            Task(
+              id: t['id'] ?? entry.key,
+              title: t['title'] ?? '',
+              isDone: t['isDone'] == true,
+              createdAt: t['createdAt'] != null
+                  ? _parseLocal(t['createdAt'])
+                  : DateTime.now(),
+              estimatedPomodoros:
+                  (t['estimatedPomodoros'] as num?)?.toInt() ?? 1,
+              completedPomodoros:
+                  (t['completedPomodoros'] as num?)?.toInt() ?? 0,
+              projectId: t['projectId'],
+              priority: (t['priority'] as num?)?.toInt() ?? 0,
+              description: t['description'],
+            ),
+          ));
+        } catch (_) {}
+      }
     }
 
+    final dayGoalRecords = <MapEntry<String, DayGoal>>[];
+    final goals = decoded['dayGoals'];
+    if (goals is Map) {
+      for (final entry in goals.entries) {
+        if (entry.value is! Map) continue;
+        try {
+          dayGoalRecords.add(MapEntry(
+            entry.key.toString(),
+            DayGoal.fromMap(Map<String, dynamic>.from(entry.value as Map)),
+          ));
+        } catch (_) {}
+      }
+    }
+
+    // Everything parsed: now write.
+    for (final e in projectRecords) {
+      await _projects.put(e.key, e.value);
+    }
+    for (final e in sessionRecords) {
+      await _sessions.put(e.key, e.value);
+    }
+    for (final e in taskRecords) {
+      await _tasks.put(e.key, e.value);
+    }
+    for (final e in dayGoalRecords) {
+      await _dayGoals.put(e.key, e.value);
+    }
+
+    final settings = decoded['settings'];
+    if (settings is Map) {
+      for (final entry in settings.entries) {
+        await _settings.put(entry.key.toString(), entry.value);
+      }
+    }
+
+    // Refresh every notifier that mirrors settings, reading through the
+    // guarded getters rather than the raw map, so the UI updates in place.
     darkModeNotifier.value = darkMode;
     zoomNotifier.value = appZoom;
+    final langCode = getSetting('language', defaultValue: 'ar');
+    localeNotifier.value = Locale(langCode is String ? langCode : 'ar');
+    quoteFavoritesNotifier.value = favoriteQuotes;
+    goalsRevision.value++;
 
-    return count;
+    return projectRecords.length +
+        sessionRecords.length +
+        taskRecords.length +
+        dayGoalRecords.length;
+  }
+
+  /// Parses an ISO timestamp into local time. `DateTime.parse` keeps a UTC
+  /// offset, which would file restored sessions under the wrong calendar day
+  /// when compared against local y/m/d everywhere else.
+  static DateTime _parseLocal(dynamic value) {
+    final parsed = DateTime.parse(value.toString());
+    return parsed.isUtc ? parsed.toLocal() : parsed;
   }
 
   // ─── Custom Quotes CRUD ───

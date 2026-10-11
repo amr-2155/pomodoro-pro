@@ -90,6 +90,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     final durationSecController = TextEditingController(
         text: (defaultDuration % 60).toString().padLeft(2, '0'));
 
+    // These controllers are attached to TextFields inside the sheet, which
+    // is never awaited — without an explicit teardown they (and the
+    // TextFields' listeners on them) leaked for the life of the State.
+    final controllers = <TextEditingController>[
+      nameController,
+      descController,
+      durationMinController,
+      durationSecController,
+    ];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -405,7 +415,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         if (name.isEmpty) return;
                         final mins = int.tryParse(durationMinController.text) ?? 0;
                         final secs = int.tryParse(durationSecController.text) ?? 0;
-                        final totalSeconds = (mins.clamp(0, 120)) * 60 + (secs.clamp(0, 59));
+                        var totalSeconds =
+                            (mins.clamp(0, 120)) * 60 + (secs.clamp(0, 59));
+                        // A 0-second default made every "start" from this
+                        // project complete instantly (end time == now).
+                        // Fall back to the global focus duration instead.
+                        if (totalSeconds <= 0) {
+                          totalSeconds = DatabaseService.focusDuration;
+                        }
                         if (project != null) {
                           project.name = name;
                           project.description = descController.text.trim();
@@ -433,6 +450,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         }
                         Navigator.pop(context);
                         _loadProjects();
+                        for (final c in controllers) {
+                          c.dispose();
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -574,26 +594,31 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   void _confirmDelete(Project project) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
+    // Keep a handle on the State context: the builder's own `context` is
+    // deactivated once the dialog is popped and must not be used afterwards.
+    final outerContext = context;
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: outerContext,
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(AppLocalizations.of(context).deleteProject),
-        content: Text(AppLocalizations.of(context).deleteConfirmMsg),
+        title: Text(l10n.deleteProject),
+        content: Text(l10n.deleteConfirmMsg),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppLocalizations.of(context).cancel),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
-            onPressed: () {
-              DatabaseService.deleteProjectCompletely(project.id);
-              Navigator.pop(context);
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(outerContext);
+              Navigator.pop(dialogContext);
+              await DatabaseService.deleteProjectCompletely(project.id);
               _loadProjects();
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 SnackBar(
-                  content: Text('${project.name} ${AppLocalizations.of(context).projectDeleted}'),
+                  content: Text('${project.name} ${l10n.projectDeleted}'),
                   backgroundColor: AppColors.error,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -601,7 +626,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               );
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: Text(AppLocalizations.of(context).delete),
+            child: Text(l10n.delete),
           ),
         ],
       ),

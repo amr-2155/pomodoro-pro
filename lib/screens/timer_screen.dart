@@ -31,6 +31,17 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   bool _tasbihMode = true;
   final FocusNode _focusNode = FocusNode();
   final GlobalKey _calcKey = GlobalKey();
+  /// Held directly instead of being looked up from [context] in [dispose]:
+  /// by then the element is defunct and an ancestor lookup would throw.
+  TimerService? _timerService;
+
+  /// Shortcuts owned by this screen. Anything else is left for `Shortcuts`
+  /// and `Actions` further up the tree.
+  static final Set<LogicalKeyboardKey> _handledKeys = {
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.keyR,
+    LogicalKeyboardKey.keyS,
+  };
 
   @override
   void initState() {
@@ -39,6 +50,7 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSettings();
       final timerService = context.read<TimerService>();
+      _timerService = timerService;
       timerService.onBreakStart = _showBreakScreen;
       if (_selectedProjectId == null && timerService.currentProjectId != null) {
         setState(() => _selectedProjectId = timerService.currentProjectId);
@@ -79,14 +91,19 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    final timerService = context.read<TimerService>();
-    timerService.onBreakStart = null;
+    // Use the captured reference: `context` is unusable once the element has
+    // been unmounted (Flutter throws "deactivated widget's ancestor").
+    _timerService?.onBreakStart = null;
+    _timerService = null;
     _focusNode.dispose();
     super.dispose();
   }
 
   void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return;
+    // KeyDownEvent only: accepting KeyRepeatEvent meant holding Space or R
+    // flipped start/pause dozens of times per second, since the OS auto-repeat
+    // was treated as a fresh press.
+    if (event is! KeyDownEvent) return;
     final timer = context.read<TimerService>();
     if (event.logicalKey == LogicalKeyboardKey.space) {
       HapticFeedback.lightImpact();
@@ -585,7 +602,10 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
     final color = _getModeColor(timer.mode);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final interval = DatabaseService.longBreakInterval;
-    final todaySessions = timer.sessionCount;
+    // `timer.sessionCount` is a lifetime counter used for the long-break
+    // interval and milestone quotes. Labeling it "today" showed e.g.
+    // "212 sessions today" after a month of use.
+    final todaySessions = DatabaseService.getTodaySessions();
     final todayMinutes = DatabaseService.getTodayMinutes();
     final dailyGoalMin = DatabaseService.dailyTargetMinutes;
     final goalProgress = dailyGoalMin > 0 ? (todayMinutes / dailyGoalMin) : 0.0;
@@ -594,8 +614,15 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: (node, event) {
-        _handleKeyEvent(event);
-        return KeyEventResult.handled;
+        // Only claim the keys we actually act on. Returning `handled`
+        // unconditionally swallowed every key on this screen, so Tab
+        // traversal and any Shortcuts/Actions above it were dead.
+        if (event is KeyDownEvent &&
+            _handledKeys.contains(event.logicalKey)) {
+          _handleKeyEvent(event);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
       },
           child: SafeArea(
             child: SingleChildScrollView(
@@ -953,7 +980,8 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                           ),
                           _buildMiniStat(
                             Icons.flag_rounded,
-                            '${fmtMin(todayMinutes)} / ',
+                            // Had a trailing " / " pointing at nothing.
+                            '${fmtMin(todayMinutes)} / ${fmtMin(dailyGoalMin)}',
                             isDark,
                           ),
                         ],

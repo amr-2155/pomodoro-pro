@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/project.dart';
 import '../services/timer_service.dart';
+import '../services/database_service.dart';
 import '../services/ambient_sound_service.dart';
 import '../widgets/break_screen.dart';
 import '../utils/page_transitions.dart';
@@ -30,6 +31,9 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
   late AnimationController _countdownController;
   late Animation<double> _countdownScale;
   late Animation<double> _countdownOpacity;
+  /// Held directly instead of being looked up from [context] in [dispose]:
+  /// by then the element is defunct and an ancestor lookup would throw.
+  TimerService? _timerService;
 
   @override
   void initState() {
@@ -72,18 +76,22 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
 
   void _startTimer() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final timer = context.read<TimerService>();
+      _timerService = timer;
       timer.onBreakStart = _onBreakStart;
       timer.setProject(widget.project.id);
-            timer.setDurationSeconds(TimerMode.focus, widget.project.defaultDuration);
+      timer.setDurationSeconds(TimerMode.focus, widget.project.defaultDuration);
       timer.start();
     });
   }
 
   @override
   void dispose() {
-    final timer = context.read<TimerService>();
-    timer.onBreakStart = null;
+    // Use the captured reference: `context` is unusable once the element has
+    // been unmounted (Flutter throws "deactivated widget's ancestor").
+    _timerService?.onBreakStart = null;
+    _timerService = null;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _fadeController.dispose();
     _countdownController.dispose();
@@ -480,7 +488,8 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
           FadeTransition(
             opacity: _fadeAnim,
             child: Text(
-              '${timer.sessionCount} ${AppLocalizations.of(context).sessionsCount} ${AppLocalizations.of(context).today}',
+              // Lifetime counter would read "212 sessions today" after a month.
+              '${DatabaseService.getTodaySessions()} ${AppLocalizations.of(context).sessionsCount} ${AppLocalizations.of(context).today}',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.3),
                 fontSize: 13,

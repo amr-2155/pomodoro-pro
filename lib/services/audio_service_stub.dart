@@ -60,6 +60,7 @@ class AudioService {
   static bool get isPreviewPlaying => _previewPlaying;
 
   static StreamSubscription? _previewStreamSub;
+  static StreamSubscription? _previewStateSub;
 
   static Future<void> playPreviewTracked(CompletionSoundType type) async {
     _previewPlaying = true;
@@ -74,11 +75,15 @@ class AudioService {
   }
 
   static void _monitorPreview() {
+    // Both subscriptions must be dropped: the player is static and lives for
+    // the whole session, so an uncancelled listener from an old preview would
+    // keep flipping _previewPlaying and desync the settings preview toggle.
     _previewStreamSub?.cancel();
+    _previewStateSub?.cancel();
     _previewStreamSub = _previewPlayer.onPlayerComplete.listen((_) {
       _previewPlaying = false;
     });
-    _previewPlayer.onPlayerStateChanged.listen((state) {
+    _previewStateSub = _previewPlayer.onPlayerStateChanged.listen((state) {
       if (state == PlayerState.stopped || state == PlayerState.completed) {
         _previewPlaying = false;
       }
@@ -178,6 +183,9 @@ class AudioService {
       await _countdownPlayer.stop();
       _previewPlaying = false;
       _previewStreamSub?.cancel();
+      _previewStreamSub = null;
+      _previewStateSub?.cancel();
+      _previewStateSub = null;
     } catch (_) {}
   }
 

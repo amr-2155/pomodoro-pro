@@ -25,13 +25,13 @@ class ProjectAdapter extends TypeAdapter<Project> {
       totalSessions: fields[5] as int,
       totalMinutes: fields[6] as int,
       isArchived: fields[7] as bool,
-      description: fields[8] as String? ?? '',
-      weeklyGoalMinutes: fields[9] as int? ?? 0,
-      defaultDuration: fields[10] as int? ?? 1500,
-      theme: fields[11] as String? ?? 'default',
-      dailyGoalMinutes: fields[12] as int? ?? 0,
-      includeInWeeklyGoal: fields[13] as bool? ?? true,
-      tasbeehGoal: fields[14] as int? ?? 0,
+      description: fields[8] as String,
+      weeklyGoalMinutes: fields[9] as int,
+      defaultDuration: fields[10] as int,
+      theme: fields[11] as String,
+      dailyGoalMinutes: fields[12] as int,
+      includeInWeeklyGoal: fields[13] as bool,
+      tasbeehGoal: fields[14] as int,
     );
   }
 

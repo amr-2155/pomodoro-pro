@@ -78,10 +78,25 @@ Future<void> pickAndRestore(BuildContext context) async {
         },
       );
       if (confirmed == true) {
-        final count = await DatabaseService.restoreBackup(content);
-        if (context.mounted) {
-          _showSnack(context, 'Restored $count items from backup',
-              AppColors.success);
+        // restoreBackup throws on malformed/unsupported data — without
+        // this catch the exception escaped into the async callback and the
+        // user saw nothing at all after tapping Restore.
+        try {
+          final count = await DatabaseService.restoreBackup(content);
+          if (context.mounted) {
+            _showSnack(context, 'Restored $count items from backup',
+                AppColors.success);
+          }
+        } on FormatException catch (e) {
+          if (context.mounted) {
+            _showSnack(context, 'Restore failed: ${e.message}',
+                AppColors.error);
+          }
+        } catch (_) {
+          if (context.mounted) {
+            _showSnack(context, 'Restore failed — file could not be read',
+                AppColors.error);
+          }
         }
       }
     });

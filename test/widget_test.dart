@@ -56,7 +56,7 @@ void main() {
   // Called at the START of each session-manager test in the real async zone
   // (testWidgets must wrap this in tester.runAsync — Hive writes never
   // complete inside the FakeAsync zone).
-  Future<void> _clearSmState() async {
+  Future<void> clearSmState() async {
     await DatabaseService.setSetting('smCompletionPending', false);
     await DatabaseService.setSetting('smCompletionDataJson', '');
   }
@@ -196,7 +196,7 @@ void main() {
   });
 
   test('Natural countdown finish marks session completed', () async {
-    await _clearSmState();
+    await clearSmState();
     final sm = SessionManager();
     final svc = TimerService(sm);
     // Reset countdown persistence in case a prior test left it active.
@@ -215,7 +215,7 @@ void main() {
   });
 
   test('Natural break finish also shows the completion card', () async {
-    await _clearSmState();
+    await clearSmState();
     final sm = SessionManager();
     final svc = TimerService(sm);
     svc.reset();
@@ -232,7 +232,7 @@ void main() {
   });
 
   test('Skip does NOT mark session completed', () async {
-    await _clearSmState();
+    await clearSmState();
     final sm = SessionManager();
     final svc = TimerService(sm);
     svc.reset();
@@ -256,7 +256,7 @@ void main() {
 
     // Hive writes are real file I/O — they never complete inside the widget
     // test's FakeAsync zone, so force them through the real event loop.
-    await tester.runAsync(_clearSmState);
+    await tester.runAsync(clearSmState);
 
     final sm = SessionManager();
     final timer = TimerService(sm);
