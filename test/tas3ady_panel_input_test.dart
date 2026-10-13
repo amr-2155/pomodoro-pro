@@ -10,8 +10,9 @@ import 'package:pomodoro_app/widgets/tas3ady_panel.dart';
 // device, any keyboard app and on web.
 void main() {
   Future<void> pumpPanel(WidgetTester tester) async {
+    // Silence platform-channel calls (haptics) inside the FakeAsync zone.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {});
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
