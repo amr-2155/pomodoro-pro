@@ -1,15 +1,17 @@
 {
+    "id": "/pomodoro-pro/",
     "name": "Pomodoro Pro - Focus Timer",
     "short_name": "Pomodoro Pro",
     "description": "Professional Pomodoro Timer with Projects, Tasks & Statistics",
     "start_url": ".",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "background_color": "#0F1123",
     "theme_color": "#6C63FF",
     "orientation": "portrait-primary",
     "categories": ["productivity", "utilities"],
     "prefer_related_applications": false,
-    "scope": "/",
+    "scope": "/pomodoro-pro/",
     "icons": [
         {
             "src": "icons/Icon-192.png",

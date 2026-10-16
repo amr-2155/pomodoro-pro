@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
 <head>
   <base href="$FLUTTER_BASE_HREF">
 
@@ -7,7 +7,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
 
-  <meta name="description" content="Professional Pomodoro Timer with Projects, Tasks & Statistics. Stay focused and productive.">
+  <meta name="description" content="مؤقت بومودورو احترافي مع المشاريع والمهام والإحصائيات. حافظ على تركيزك وإنتاجيتك — يعمل دون إنترنت.">
   <meta name="theme-color" content="#6C63FF">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,6 +16,17 @@
   <meta name="msapplication-TileColor" content="#6C63FF">
   <meta name="msapplication-tap-highlight" content="no">
 
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pomodoro Pro">
+  <meta property="og:title" content="Pomodoro Pro — مؤقت تركيز احترافي">
+  <meta property="og:description" content="مؤقت بومودورو مع المشاريع والمهام والإحصائيات. حافظ على تركيزك وإنتاجيتك.">
+  <meta property="og:url" content="https://amr-2155.github.io/pomodoro-pro/">
+  <meta property="og:image" content="https://amr-2155.github.io/pomodoro-pro/icons/Icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Pomodoro Pro — مؤقت تركيز احترافي">
+  <meta name="twitter:description" content="مؤقت بومودورو مع المشاريع والمهام والإحصائيات.">
+  <meta name="twitter:image" content="https://amr-2155.github.io/pomodoro-pro/icons/Icon-512.png">
+
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
   <link rel="manifest" href="manifest.json">
@@ -23,21 +34,80 @@
   <title>Pomodoro Pro</title>
 
   <style>
-    body {
+    html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
       background-color: #0F1123;
       overflow: hidden;
+    }
+
+    #app-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      background: radial-gradient(circle at 50% 40%, #1b1e3d 0%, #0F1123 70%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: opacity 0.4s ease;
+    }
+    #app-splash.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .splash-ring {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      border: 5px solid rgba(108, 99, 255, 0.18);
+      border-top-color: #6C63FF;
+      animation: splash-spin 0.9s linear infinite;
+    }
+    .splash-title {
+      color: #E8EAF6;
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .splash-sub {
+      color: #8b8fbd;
+      font-size: 13px;
+    }
+    @keyframes splash-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-ring { animation-duration: 2.5s; }
     }
   </style>
 </head>
 <body>
+  <div id="app-splash" role="status" aria-live="polite">
+    <div class="splash-ring"></div>
+    <div class="splash-title">Pomodoro Pro</div>
+    <div class="splash-sub">جارٍ التحميل…</div>
+  </div>
+
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('flutter-first-frame', function() {
-        navigator.serviceWorker.register('sw.js').catch(function() {});
-      });
-    }
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('app-splash');
+      if (splash) {
+        splash.classList.add('is-hidden');
+        setTimeout(function () { splash.remove(); }, 500);
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      }
+    });
+    // Safety net: never leave the user stuck on the splash screen.
+    setTimeout(function () {
+      var splash = document.getElementById('app-splash');
+      if (splash) { splash.classList.add('is-hidden'); }
+    }, 8000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
