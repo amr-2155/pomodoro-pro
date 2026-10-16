@@ -64,17 +64,23 @@ class _TimerCircleState extends State<TimerCircle>
     final size = (screenWidth * 0.62).clamp(180.0, 280.0);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
-      child: AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          final pulse =
-              widget.isRunning ? 1.0 + (_pulseController.value * 0.015) : 1.0;
-          return Transform.scale(scale: pulse, child: child);
-        },
-        child: SizedBox(
+    return Semantics(
+      button: widget.onTap != null,
+      label: '${widget.label}: ${widget.time}',
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            final pulse =
+                widget.isRunning ? 1.0 + (_pulseController.value * 0.015) : 1.0;
+            return Transform.scale(
+              scale: pulse,
+              child: RepaintBoundary(child: child),
+            );
+          },
+          child: SizedBox(
           width: size,
           height: size,
           child: Stack(
@@ -155,6 +161,7 @@ class _TimerCircleState extends State<TimerCircle>
             ],
           ),
         ),
+      ),
       ),
     );
   }

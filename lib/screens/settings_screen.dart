@@ -11,6 +11,7 @@ import '../services/timer_service.dart';
 import '../services/completion_sound.dart';
 import '../services/audio_service.dart';
 import '../utils/constants.dart';
+import '../utils/page_transitions.dart';
 import '../widgets/goal_cards.dart';
 import 'quote_library_screen.dart';
 
@@ -109,8 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icons.format_quote_rounded,
               () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const QuoteLibraryScreen()),
+                AppPageRoute(page: const QuoteLibraryScreen()),
               ),
             ),
 
