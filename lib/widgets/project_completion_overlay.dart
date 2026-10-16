@@ -72,7 +72,7 @@ class _ProjectCompletionOverlayState extends State<ProjectCompletionOverlay>
       AppColors.success,
       AppColors.primary,
       AppColors.warning,
-      const Color(0xFF00BCD4),
+      AppColors.info,
     ];
     for (int i = 0; i < 24; i++) {
       _pieces.add(_MiniConfetti(
@@ -180,7 +180,7 @@ class _ProjectCompletionOverlayState extends State<ProjectCompletionOverlay>
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(colors: [
                             AppColors.success,
-                            Color(0xFF66BB6A),
+                            AppColors.successLight,
                           ]),
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -236,7 +236,7 @@ class _RingCheckPainter extends CustomPainter {
       ..shader = const SweepGradient(
         startAngle: -pi / 2,
         endAngle: 3 * pi / 2,
-        colors: [AppColors.success, Color(0xFF66BB6A)],
+        colors: [AppColors.success, AppColors.successLight],
         transform: GradientRotation(-pi / 2),
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawArc(

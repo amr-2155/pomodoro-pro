@@ -278,7 +278,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         color: surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF2A2E4F) : const Color(0xFFE4E7EF),
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
           width: 1,
         ),
         boxShadow: [
@@ -368,7 +368,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: widget.isDark ? const Color(0xFF2A2E4F) : const Color(0xFFE4E7EF),
+      color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
     );
   }
 
@@ -378,7 +378,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
       decoration: BoxDecoration(
         color: widget.isDark
             ? Colors.white.withValues(alpha: 0.06)
-            : const Color(0xFFF0F1F6),
+            : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -442,7 +442,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
       filled: true,
       fillColor: widget.isDark
           ? Colors.white.withValues(alpha: 0.05)
-          : const Color(0xFFF7F8FB),
+          : AppColors.surfaceAlt,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -452,7 +452,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
           color:
-              widget.isDark ? const Color(0xFF2A2E4F) : const Color(0xFFE4E7EF),
+              widget.isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
       ),
       focusedBorder: OutlineInputBorder(
@@ -551,8 +551,8 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
             color: active
                 ? AppColors.primary
                 : widget.isDark
-                    ? const Color(0xFF2A2E4F)
-                    : const Color(0xFFE4E7EF),
+                    ? AppColors.borderDark
+                    : AppColors.borderLight,
           ),
         ),
         child: Text(
@@ -861,7 +861,7 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
                 decoration: BoxDecoration(
                   color: widget.isDark
                       ? Colors.white.withValues(alpha: 0.05)
-                      : const Color(0xFFF0F1F6),
+                      : AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -949,8 +949,8 @@ class _Tas3adyDhikrCalculatorState extends State<Tas3adyDhikrCalculator> {
             color: active
                 ? AppColors.info
                 : widget.isDark
-                    ? const Color(0xFF2A2E4F)
-                    : const Color(0xFFE4E7EF),
+                    ? AppColors.borderDark
+                    : AppColors.borderLight,
           ),
         ),
         child: Text(

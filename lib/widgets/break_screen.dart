@@ -98,7 +98,7 @@ class _BreakScreenState extends State<BreakScreen>
     return Scaffold(
       backgroundColor: isDark
           ? AppColors.backgroundDark
-          : const Color(0xFFF0F7F2),
+          : AppColors.breakSurfaceLight,
       body: SafeArea(
         child: Column(
           children: [
@@ -115,7 +115,7 @@ class _BreakScreenState extends State<BreakScreen>
                   fontStyle: FontStyle.italic,
                   color: isDark
                       ? AppColors.tasbeehGreen.withValues(alpha: 0.9)
-                      : const Color(0xFF1E5B33),
+                      : AppColors.breakTextDeep,
                 ),
               ),
             ),

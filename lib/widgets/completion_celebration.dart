@@ -114,8 +114,8 @@ class _CompletionCelebrationState extends State<CompletionCelebration>
       AppColors.accent,
       AppColors.success,
       AppColors.warning,
-      const Color(0xFF00BCD4),
-      const Color(0xFF9C27B0),
+      AppColors.info,
+      AppColors.purple,
     ];
     for (int i = 0; i < 42; i++) {
       _pieces.add(_Confetti(

@@ -39,6 +39,20 @@ class AppColors {
   static const star = Color(0xFFFFB300);
   static const tasbeehGreen = Color(0xFF34A853);
 
+  // Extra semantic accents
+  static const purple = Color(0xFF9C27B0);
+  static const pink = Color(0xFFE91E63);
+  static const amber = Color(0xFFF59E0B);
+  static const successLight = Color(0xFF66BB6A);
+
+  // Extra surfaces
+  static const surfaceAlt = Color(0xFFF7F8FB);
+  static const surfaceDarkAlt = Color(0xFF1E2130);
+
+  // Break-mode palette
+  static const breakSurfaceLight = Color(0xFFF0F7F2);
+  static const breakTextDeep = Color(0xFF1E5B33);
+
   // Accessible project palette (kept for backward data compatibility)
   static const projectColors = [
     Color(0xFF6C63FF),
@@ -52,6 +66,20 @@ class AppColors {
     Color(0xFF009688),
     Color(0xFFFF5722),
   ];
+}
+
+/// Gradient pairs for the project "theme" picker.
+class AppGradients {
+  static const defaultTheme = [Color(0xFF6C63FF), Color(0xFF8B83FF)];
+  static const reading = [Color(0xFF5D4037), Color(0xFF8D6E63)];
+  static const coding = [Color(0xFF1B5E20), Color(0xFF4CAF50)];
+  static const design = [Color(0xFFE65100), Color(0xFFFF9800)];
+  static const writing = [Color(0xFF4A148C), Color(0xFF9C27B0)];
+  static const study = [Color(0xFF0D47A1), Color(0xFF2196F3)];
+  static const music = [Color(0xFF880E4F), Color(0xFFE91E63)];
+  static const fitness = [Color(0xFFBF360C), Color(0xFFFF5722)];
+  static const meditation = [Color(0xFF004D40), Color(0xFF009688)];
+  static const art = [Color(0xFF311B92), Color(0xFF673AB7)];
 }
 
 /// Corner-radius scale.
@@ -232,14 +260,27 @@ class AppTheme {
         ),
         showDragHandle: false,
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceLight,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textMutedLight,
-        type: BottomNavigationBarType.fixed,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.14),
         elevation: 0,
-        selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: TextStyle(fontSize: 11),
+        height: 68,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? AppColors.primary : AppColors.textMutedLight,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            size: 24,
+            color: selected ? AppColors.primary : AppColors.textMutedLight,
+          );
+        }),
       ),
     );
   }
@@ -355,14 +396,27 @@ class AppTheme {
         ),
         showDragHandle: false,
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
-        selectedItemColor: AppColors.primaryLight,
-        unselectedItemColor: AppColors.textMutedDark,
-        type: BottomNavigationBarType.fixed,
+        indicatorColor: AppColors.primaryLight.withValues(alpha: 0.2),
         elevation: 0,
-        selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: TextStyle(fontSize: 11),
+        height: 68,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? AppColors.primaryLight : AppColors.textMutedDark,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            size: 24,
+            color: selected ? AppColors.primaryLight : AppColors.textMutedDark,
+          );
+        }),
       ),
     );
   }

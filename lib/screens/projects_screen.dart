@@ -26,16 +26,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   final _searchController = TextEditingController();
 
   static const _themes = [
-    {'key': 'default', 'name': 'Default', 'icon': '🎯', 'gradient': [Color(0xFF6C63FF), Color(0xFF8B83FF)]},
-    {'key': 'reading', 'name': 'Reading', 'icon': '📚', 'gradient': [Color(0xFF5D4037), Color(0xFF8D6E63)]},
-    {'key': 'coding', 'name': 'Coding', 'icon': '💻', 'gradient': [Color(0xFF1B5E20), Color(0xFF4CAF50)]},
-    {'key': 'design', 'name': 'Design', 'icon': '🎨', 'gradient': [Color(0xFFE65100), Color(0xFFFF9800)]},
-    {'key': 'writing', 'name': 'Writing', 'icon': '✍️', 'gradient': [Color(0xFF4A148C), Color(0xFF9C27B0)]},
-    {'key': 'study', 'name': 'Study', 'icon': '🎓', 'gradient': [Color(0xFF0D47A1), Color(0xFF2196F3)]},
-    {'key': 'music', 'name': 'Music', 'icon': '🎵', 'gradient': [Color(0xFF880E4F), Color(0xFFE91E63)]},
-    {'key': 'fitness', 'name': 'Fitness', 'icon': '🏋️', 'gradient': [Color(0xFFBF360C), Color(0xFFFF5722)]},
-    {'key': 'meditation', 'name': 'Meditate', 'icon': '🧘', 'gradient': [Color(0xFF004D40), Color(0xFF009688)]},
-    {'key': 'art', 'name': 'Art', 'icon': '🖌️', 'gradient': [Color(0xFF311B92), Color(0xFF673AB7)]},
+    {'key': 'default', 'name': 'Default', 'icon': '🎯', 'gradient': AppGradients.defaultTheme},
+    {'key': 'reading', 'name': 'Reading', 'icon': '📚', 'gradient': AppGradients.reading},
+    {'key': 'coding', 'name': 'Coding', 'icon': '💻', 'gradient': AppGradients.coding},
+    {'key': 'design', 'name': 'Design', 'icon': '🎨', 'gradient': AppGradients.design},
+    {'key': 'writing', 'name': 'Writing', 'icon': '✍️', 'gradient': AppGradients.writing},
+    {'key': 'study', 'name': 'Study', 'icon': '🎓', 'gradient': AppGradients.study},
+    {'key': 'music', 'name': 'Music', 'icon': '🎵', 'gradient': AppGradients.music},
+    {'key': 'fitness', 'name': 'Fitness', 'icon': '🏋️', 'gradient': AppGradients.fitness},
+    {'key': 'meditation', 'name': 'Meditate', 'icon': '🧘', 'gradient': AppGradients.meditation},
+    {'key': 'art', 'name': 'Art', 'icon': '🖌️', 'gradient': AppGradients.art},
   ];
 
   static const _durations = [5, 10, 15, 20, 25, 30, 45, 60, 90];

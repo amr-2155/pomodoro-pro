@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../utils/constants.dart';
+
 void downloadBackup(BuildContext context, String json) {
   showDialog(
     context: context,
     builder: (ctx) {
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
       return AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E2130) : Colors.white,
+        backgroundColor: isDark ? AppColors.surfaceDarkAlt : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Backup Data'),
         content: Text(
@@ -31,7 +33,7 @@ Future<void> pickAndRestore(BuildContext context) async {
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
       content: Text('Restore is only available on the web version'),
-      backgroundColor: Color(0xFFF59E0B),
+      backgroundColor: AppColors.amber,
       behavior: SnackBarBehavior.floating,
     ),
   );
