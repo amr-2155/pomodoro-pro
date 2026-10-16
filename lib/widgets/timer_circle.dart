@@ -28,6 +28,7 @@ class TimerCircle extends StatefulWidget {
 class _TimerCircleState extends State<TimerCircle>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
+  bool _reduceMotion = false;
 
   @override
   void initState() {
@@ -36,17 +37,28 @@ class _TimerCircleState extends State<TimerCircle>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-    if (widget.isRunning) {
-      _pulseController.repeat(reverse: true);
-    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    _syncPulse();
   }
 
   @override
   void didUpdateWidget(TimerCircle oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isRunning && !_pulseController.isAnimating) {
+    _syncPulse();
+  }
+
+  /// Runs the breathing pulse only while the timer is active and the user has
+  /// not asked the system to reduce motion.
+  void _syncPulse() {
+    final shouldPulse = widget.isRunning && !_reduceMotion;
+    if (shouldPulse && !_pulseController.isAnimating) {
       _pulseController.repeat(reverse: true);
-    } else if (!widget.isRunning && _pulseController.isAnimating) {
+    } else if (!shouldPulse && _pulseController.isAnimating) {
       _pulseController.stop();
       _pulseController.reset();
     }

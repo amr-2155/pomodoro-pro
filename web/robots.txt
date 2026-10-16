@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://amr-2155.github.io/pomodoro-pro/sitemap.xml
