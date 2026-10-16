@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
-import '../utils/constants.dart';
 import 'timer_screen.dart';
 import 'projects_screen.dart';
 import 'statistics_screen.dart';
@@ -46,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.06),
@@ -55,42 +53,40 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        child: SafeArea(
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (index) {
-              HapticFeedback.selectionClick();
-              setState(() => _currentIndex = index);
-            },
-            type: BottomNavigationBarType.fixed,
-            items: [
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.timer_outlined),
-                activeIcon: const Icon(Icons.timer),
-                label: l10n.timer,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.folder_outlined),
-                activeIcon: const Icon(Icons.folder),
-                label: l10n.projects,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.checklist_outlined),
-                activeIcon: const Icon(Icons.checklist),
-                label: l10n.tasks,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.bar_chart_outlined),
-                activeIcon: const Icon(Icons.bar_chart),
-                label: l10n.stats,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.settings_outlined),
-                activeIcon: const Icon(Icons.settings),
-                label: l10n.settings,
-              ),
-            ],
-          ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (index) {
+            HapticFeedback.selectionClick();
+            setState(() => _currentIndex = index);
+          },
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(Icons.timer_outlined),
+              selectedIcon: const Icon(Icons.timer),
+              label: l10n.timer,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.folder_outlined),
+              selectedIcon: const Icon(Icons.folder),
+              label: l10n.projects,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.checklist_outlined),
+              selectedIcon: const Icon(Icons.checklist),
+              label: l10n.tasks,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.bar_chart_outlined),
+              selectedIcon: const Icon(Icons.bar_chart),
+              label: l10n.stats,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings),
+              label: l10n.settings,
+            ),
+          ],
         ),
       ),
     );

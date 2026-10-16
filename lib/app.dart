@@ -6,6 +6,7 @@ import 'services/database_service.dart';
 import 'utils/app_keys.dart';
 import 'utils/constants.dart';
 import 'widgets/completion_overlay.dart';
+import 'widgets/responsive_layout.dart';
 
 class PomodoroApp extends StatelessWidget {
   const PomodoroApp({super.key});
@@ -38,7 +39,9 @@ class PomodoroApp extends StatelessWidget {
                   textDirection: locale.languageCode == 'ar'
                       ? TextDirection.rtl
                       : TextDirection.ltr,
-                  child: CompletionOverlay(child: child!),
+                  child: CompletionOverlay(
+                    child: ResponsiveFrame(child: child!),
+                  ),
                 );
               },
               home: const HomeScreen(),
