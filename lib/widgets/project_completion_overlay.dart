@@ -45,7 +45,7 @@ class _ProjectCompletionOverlayState extends State<ProjectCompletionOverlay>
   late Animation<double> _ring;
   late Animation<double> _check;
   late Animation<double> _cardScale;
-  List<_MiniConfetti> _pieces = [];
+  final List<_MiniConfetti> _pieces = [];
 
   @override
   void initState() {

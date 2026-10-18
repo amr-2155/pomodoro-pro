@@ -139,7 +139,7 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: AppColors.surfaceDark,
             borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
           ),

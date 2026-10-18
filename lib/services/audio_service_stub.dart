@@ -17,7 +17,7 @@ class AudioService {
   static Timer? _vibrationTimer;
 
   static AudioContext get _audioContext => AudioContext(
-        android: AudioContextAndroid(
+        android: const AudioContextAndroid(
           contentType: AndroidContentType.sonification,
           usageType: AndroidUsageType.alarm,
           audioFocus: AndroidAudioFocus.gain,

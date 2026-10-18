@@ -226,7 +226,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                         (session.count ?? 0) > 0) ...[
                       Text(
                         '${AppLocalizations.of(context).tasbeehType} • ${session.count} ${AppLocalizations.of(context).timesWord}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.success,
@@ -253,7 +253,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      '${fmtMin(session.actualMinutes ?? session.durationMinutes)}',
+                      fmtMin(session.actualMinutes ?? session.durationMinutes),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

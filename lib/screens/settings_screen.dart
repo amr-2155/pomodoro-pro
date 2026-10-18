@@ -723,7 +723,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (stale == 0) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('لا توجد جلسات أقدم من سنة'),
+          content: const Text('لا توجد جلسات أقدم من سنة'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -916,7 +916,7 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                         ),
                       ),
                       if (isSelected) ...[const SizedBox(width: 6),
-                        Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
+                        const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
                     ]),
                     onTap: () {
                       widget.onStopPreview();
@@ -1053,7 +1053,7 @@ class _CountdownPickerSheetState extends State<_CountdownPickerSheet> {
                         ),
                       ),
                       if (isSelected) ...[const SizedBox(width: 6),
-                        Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
+                        const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
                     ]),
                     onTap: () => setState(() => _selectedType = type),
                   ),

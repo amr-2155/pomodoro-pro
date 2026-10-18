@@ -164,7 +164,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 Expanded(
                   child: _buildStatCard(
                     l10n.today,
-                    '${todayMinutes}${l10n.minShort}',
+                    '$todayMinutes${l10n.minShort}',
                     '$todaySessions ${l10n.sessionsCount}',
                     Icons.access_time_rounded,
                     AppColors.focusColor,
@@ -175,7 +175,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 Expanded(
                   child: _buildStatCard(
                     l10n.thisWeek,
-                    '${weekMinutes}${l10n.minShort}',
+                    '$weekMinutes${l10n.minShort}',
                     '$weekSessions ${l10n.sessionsCount}',
                     Icons.calendar_view_week_rounded,
                     AppColors.success,
@@ -190,7 +190,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 Expanded(
                   child: _buildStatCard(
                     l10n.thisMonth,
-                    '${monthMinutes}${l10n.minShort}',
+                    '$monthMinutes${l10n.minShort}',
                     '',
                     Icons.calendar_month_rounded,
                     AppColors.warning,
@@ -547,7 +547,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                '${l10n.dailyGoalStat}: ${dailyGoalMin}${l10n.minShort}',
+                '${l10n.dailyGoalStat}: $dailyGoalMin${l10n.minShort}',
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold),
               ),
@@ -1025,7 +1025,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _goalStatMini(
-                    Icons.emoji_events_rounded, '${bestDay}${l10n.minShort}', l10n.bestDay, AppColors.warning, isDark),
+                    Icons.emoji_events_rounded, '$bestDay${l10n.minShort}', l10n.bestDay, AppColors.warning, isDark),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1040,7 +1040,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             children: [
               Expanded(
                 child: _goalStatMini(
-                    Icons.insights_rounded, '${dailyAvg}${l10n.minDay}', l10n.dailyAverage, AppColors.accent, isDark),
+                    Icons.insights_rounded, '$dailyAvg${l10n.minDay}', l10n.dailyAverage, AppColors.accent, isDark),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1197,7 +1197,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Text('${current}${l10n.minShort}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('$current${l10n.minShort}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 8),
                 if (previous > 0 || current > 0)
                   Container(

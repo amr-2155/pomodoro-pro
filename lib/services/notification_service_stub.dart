@@ -26,7 +26,7 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.alarm,
-      sound: RawResourceAndroidNotificationSound('alarm'),
+      sound: const RawResourceAndroidNotificationSound('alarm'),
       playSound: true,
       enableVibration: true,
       vibrationPattern: _vibrationPattern,

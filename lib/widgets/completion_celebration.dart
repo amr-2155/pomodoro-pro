@@ -208,7 +208,7 @@ class _CompletionCelebrationState extends State<CompletionCelebration>
                         child: Container(
                           width: 76,
                           height: 76,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,

@@ -230,7 +230,7 @@ class ProjectCard extends StatelessWidget {
                 children: [
                   _buildChip(
                     Icons.today_rounded,
-                    '${fmtMin(todayMin)}',
+                    fmtMin(todayMin),
                     'Today',
                     color,
                     isDark,
@@ -243,7 +243,7 @@ class ProjectCard extends StatelessWidget {
                   ),
                   _buildChip(
                     Icons.date_range_rounded,
-                    '${fmtMin(weekMin)}',
+                    fmtMin(weekMin),
                     'Week',
                     color,
                     isDark,

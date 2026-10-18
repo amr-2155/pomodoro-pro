@@ -205,10 +205,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final l10n = AppLocalizations.of(context);
     return Row(
       children: [
-        _buildMiniStat(l10n.today, '${fmtMin(_todayMinutes)}', Icons.today_rounded,
+        _buildMiniStat(l10n.today, fmtMin(_todayMinutes), Icons.today_rounded,
             color, isDark),
         const SizedBox(width: 10),
-        _buildMiniStat(l10n.weeklyChart, '${fmtMin(_weekMinutes)}', Icons.date_range_rounded,
+        _buildMiniStat(l10n.weeklyChart, fmtMin(_weekMinutes), Icons.date_range_rounded,
             color, isDark),
         const SizedBox(width: 10),
         _buildMiniStat(
@@ -313,7 +313,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
-                        '${fmtMin(rod.toY.toInt())}',
+                        fmtMin(rod.toY.toInt()),
                         const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -599,7 +599,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '${fmtMin(session.actualMinutes ?? session.durationMinutes)}',
+                        fmtMin(session.actualMinutes ?? session.durationMinutes),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

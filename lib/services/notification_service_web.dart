@@ -25,7 +25,7 @@ class NotificationService {
       // requestPermission() returns a Promise; reading the state on the very
       // next line would always sample the pre-grant value. Await it instead.
       final result = await web.Notification.requestPermission().toDart;
-      _hasPermission = (result == 'granted') ||
+      _hasPermission = (result.toDart == 'granted') ||
           (web.Notification.permission == 'granted');
     } catch (_) {}
   }
@@ -52,7 +52,7 @@ class NotificationService {
   }
 
   /// No-op on web: browser notifications cannot be cancelled programmatically.
-/// (The previous `if (kIsWeb) return;` guard made this permanently unreachable.)
+  /// (The previous `if (kIsWeb) return;` guard made this permanently unreachable.)
   static Future<void> cancelAll() async {}
 
   static Future<bool> scheduleAt(

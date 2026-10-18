@@ -215,11 +215,11 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
         builder: (ctx) => AlertDialog(
           title: Text(AppLocalizations.of(context).discardStopwatch),
           content: Text(
-            AppLocalizations.of(context).stopwatchRunning + ' ' + formatDurationLocalized(
+            '${AppLocalizations.of(context).stopwatchRunning} ${formatDurationLocalized(
               hours: timer.stopwatchElapsed.inHours,
               minutes: timer.stopwatchElapsed.inMinutes % 60,
               seconds: timer.stopwatchElapsed.inSeconds % 60,
-            ),
+            )}',
           ),
           actions: [
             TextButton(
@@ -960,7 +960,7 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                         children: [
                           _buildMiniStat(
                             Icons.access_time_rounded,
-                            '${fmtMin(todayMinutes)}',
+                            fmtMin(todayMinutes),
                             isDark,
                           ),
                           Container(

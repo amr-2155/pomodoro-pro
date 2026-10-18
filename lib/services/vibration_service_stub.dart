@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 /// Falls back to HapticFeedback on other platforms.
 class VibrationService {
   static const _channel = MethodChannel('com.pomodoro.vibration');
-  static bool _available = Platform.isAndroid;
+  static final bool _available = Platform.isAndroid;
 
   /// Strong single vibration pulse.
   static Future<void> vibrate({int duration = 500, int amplitude = 255}) async {

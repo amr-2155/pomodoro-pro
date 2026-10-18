@@ -218,7 +218,7 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surfaceMuted,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        hintStyle: TextStyle(color: AppColors.textMutedLight, fontSize: 14),
+        hintStyle: const TextStyle(color: AppColors.textMutedLight, fontSize: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide.none,
@@ -248,7 +248,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
-          side: BorderSide(color: AppColors.borderLight),
+          side: const BorderSide(color: AppColors.borderLight),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
@@ -384,7 +384,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primaryLight,
-          side: BorderSide(color: AppColors.borderDark),
+          side: const BorderSide(color: AppColors.borderDark),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
