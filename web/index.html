@@ -162,6 +162,16 @@
       -webkit-text-fill-color: transparent;
       animation: sp-rise .7s .08s cubic-bezier(.22,1,.36,1) both;
     }
+    .sp-tagline {
+      color: #A6ABD8;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: .2px;
+      line-height: 1.5;
+      margin: -2px auto 0;
+      max-width: 22rem;
+      animation: sp-rise .7s .14s cubic-bezier(.22,1,.36,1) both;
+    }
     .sp-sub {
       color: var(--sp-muted);
       font-size: 14.5px;
@@ -235,6 +245,7 @@
       </div>
       <div class="sp-brand">
         <div class="sp-title">Pomodoro Pro</div>
+        <div class="sp-tagline">مؤقت تركيز احترافي لإدارة وقتك ومهامك</div>
         <div class="sp-sub">
           جارٍ التحميل<span class="sp-dots" aria-hidden="true"><i></i><i></i><i></i></span>
         </div>
@@ -245,10 +256,14 @@
 
   <script>
     (function () {
+      var MIN_MS = 3000;   // show the splash ~3s so it reads as a real intro
       var CIRC = 2 * Math.PI * 65; // r=65 -> ~408.4
       var arc = document.getElementById('spArc');
       var bar = document.getElementById('spBar');
       var shown = 0;
+      var frameReady = false;
+      var start = performance.now();
+      var dismissed = false;
 
       function setProgress(pct) {
         pct = Math.max(0, Math.min(100, pct));
@@ -258,25 +273,44 @@
         if (bar) { bar.style.width = pct + '%'; }
       }
 
-      // Creep toward 90% while the engine boots so the bar feels alive,
-      // then complete it on first frame.
-      var creep = setInterval(function () {
-        setProgress(Math.min(90, shown + Math.max(0.6, (90 - shown) * 0.06)));
-      }, 120);
+      // Drive the ring/bar to fill over MIN_MS, then hold at 92% until the
+      // first frame actually paints, so it never looks stuck.
+      function tick() {
+        var elapsed = performance.now() - start;
+        var pct = Math.min(92, (elapsed / MIN_MS) * 100);
+        setProgress(pct);
+        if (elapsed < MIN_MS) { requestAnimationFrame(tick); }
+      }
+      requestAnimationFrame(tick);
 
-      function dismiss() {
-        setProgress(100);
+      function hide() {
         var splash = document.getElementById('app-splash');
         if (splash && !splash.classList.contains('is-hidden')) {
           splash.classList.add('is-hidden');
           setTimeout(function () { splash.remove(); }, 600);
         }
-        clearInterval(creep);
       }
 
-      window.addEventListener('flutter-first-frame', dismiss);
-      // Safety net: never leave the user stuck on the splash screen.
-      setTimeout(dismiss, 9000);
+      function dismiss() {
+        if (dismissed) { return; }
+        dismissed = true;
+        setProgress(100);
+        hide();
+      }
+
+      function tryDismiss() {
+        if (!frameReady) { return; }
+        var remaining = MIN_MS - (performance.now() - start);
+        if (remaining <= 0) { dismiss(); }
+        else { setTimeout(dismiss, remaining); }
+      }
+
+      window.addEventListener('flutter-first-frame', function () {
+        frameReady = true;
+        tryDismiss();
+      });
+      // Safety nets: never leave the user stuck on the splash screen.
+      setTimeout(function () { frameReady = true; tryDismiss(); }, MIN_MS + 4000);
     })();
   </script>
   <script>
