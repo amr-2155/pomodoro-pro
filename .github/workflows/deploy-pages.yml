@@ -25,6 +25,8 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build web --base-href /pomodoro-pro/
+      - name: Stamp service worker with build id
+        run: sed -i "s/__BUILD__/${GITHUB_SHA}/g" build/web/sw.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web

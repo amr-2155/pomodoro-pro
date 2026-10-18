@@ -271,15 +271,48 @@
           splash.classList.add('is-hidden');
           setTimeout(function () { splash.remove(); }, 600);
         }
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('sw.js').catch(function () {});
-        }
         clearInterval(creep);
       }
 
       window.addEventListener('flutter-first-frame', dismiss);
       // Safety net: never leave the user stuck on the splash screen.
       setTimeout(dismiss, 9000);
+    })();
+  </script>
+  <script>
+    // ---- Service worker: automatic updates ----
+    // The build used to be served cache-first, so a design change only appeared
+    // after a manual Ctrl+F5. sw.js is now network-first, so a plain reload
+    // fetches the new build — and this block reloads the page once (and only
+    // once) when a new service worker takes control, so an already-open tab
+    // updates by itself too.
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+
+      var refreshing = false;
+      var hadController = !!navigator.serviceWorker.controller;
+
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!hadController || refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+
+      var register = function () {
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+          .then(function (reg) {
+            var check = function () { reg.update().catch(function () {}); };
+            check();
+            setInterval(check, 30 * 60 * 1000);
+            document.addEventListener('visibilitychange', function () {
+              if (!document.hidden) check();
+            });
+          })
+          .catch(function () {});
+      };
+
+      if (document.readyState === 'complete') register();
+      else window.addEventListener('load', register);
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
