@@ -657,15 +657,11 @@ double get progress =>
       _completionQuote = QuoteLibrary.quoteText(quote);
       _completionQuoteSource = quote['source'] ?? '';
 
-      final actualElapsed = _startedAt != null
-          ? DateTime.now().difference(_startedAt!).inSeconds
-          : _totalSeconds - _seconds;
-      _startedAt = null;
       final session = Session(
         id: const Uuid().v4(),
         projectId: _currentProjectId ?? '',
         durationMinutes: _totalSeconds ~/ 60,
-        actualMinutes: actualElapsed ~/ 60,
+        actualMinutes: null,
         completed: !_wasSkipped,
         sessionType: 'focus',
         taskId: _currentTaskId,
@@ -707,7 +703,7 @@ double get progress =>
           completionQuote: _completionQuote,
           completionQuoteSource: _completionQuoteSource,
           durationMinutes: _totalSeconds ~/ 60,
-          actualMinutes: actualElapsed ~/ 60,
+          actualMinutes: null,
           projectId: _currentProjectId,
           projectName: projectName,
         );
@@ -775,7 +771,7 @@ double get progress =>
     final weekMin = DatabaseService.getSessionsForWeek()
         .where((s) =>
             s.completed && s.projectId == pid && s.sessionType != 'tasbeeh')
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
     if (weekMin < project.weeklyGoalMinutes) return;
 
     final key =

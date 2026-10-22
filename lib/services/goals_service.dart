@@ -228,7 +228,7 @@ class GoalsService extends ChangeNotifier {
     final sessions = DatabaseService.getSessionsForWeek()
         .where((s) => s.completed && s.sessionType != 'tasbeeh' && s.projectId == projectId);
     return sessions.fold(
-        0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        0, (sum, s) => sum + s.durationMinutes);
   }
 
   void _ensureTodayGoal() {

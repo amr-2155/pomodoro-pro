@@ -61,6 +61,7 @@ class DatabaseService {
 
     await _migrateDurationsToSeconds();
     await _migrateProjectDurationsToSeconds();
+    await _clampDurations();
     await _migrateSoundSettings();
 
     darkModeNotifier.value = darkMode;
@@ -93,10 +94,43 @@ class DatabaseService {
     for (final project in _projects.values) {
       if (project.defaultDuration <= 120) {
         project.defaultDuration = project.defaultDuration * 60;
+      }
+      if (project.defaultDuration < 60) {
+        project.defaultDuration = focusDuration;
+      }
+      if (project.defaultDuration > 120 * 60) {
+        project.defaultDuration = 120 * 60;
+      }
+      await project.save();
+    }
+    await _settings.put('projectDurationsInSeconds', true);
+  }
+
+  static Future<void> _clampDurations() async {
+    if (getSetting('durationsClampedV2', defaultValue: false) == true) return;
+    final focus = focusDuration.clamp(60, 120 * 60);
+    if (focus != focusDuration) {
+      await _settings.put('focusDuration', focus);
+    }
+    final short = shortBreakDuration.clamp(60, 120 * 60);
+    if (short != shortBreakDuration) {
+      await _settings.put('shortBreakDuration', short);
+    }
+    final long = longBreakDuration.clamp(60, 120 * 60);
+    if (long != longBreakDuration) {
+      await _settings.put('longBreakDuration', long);
+    }
+    for (final project in _projects.values) {
+      var d = project.defaultDuration;
+      if (d < 60 || d > 120 * 60) {
+        d = focusDuration;
+      }
+      if (d != project.defaultDuration) {
+        project.defaultDuration = d;
         await project.save();
       }
     }
-    await _settings.put('projectDurationsInSeconds', true);
+    await _settings.put('durationsClampedV2', true);
   }
 
   // Projects
@@ -233,7 +267,7 @@ class DatabaseService {
         if (project != null) {
           project.totalSessions++;
           project.totalMinutes +=
-              (session.actualMinutes ?? session.durationMinutes);
+              session.durationMinutes;
           await project.save();
         }
       });
@@ -252,7 +286,7 @@ class DatabaseService {
           // set (e.g. after a backup restore), and must never go negative.
           project.totalSessions = (project.totalSessions - 1).clamp(0, 1 << 30);
           project.totalMinutes =
-              (project.totalMinutes - (session.actualMinutes ?? session.durationMinutes))
+              (project.totalMinutes - session.durationMinutes)
                   .clamp(0, 1 << 31);
           await project.save();
         }
@@ -345,7 +379,7 @@ class DatabaseService {
         final project = _projects.get(s.projectId);
         if (project == null || !project.includeInWeeklyGoal) continue;
       }
-      total += (s.actualMinutes ?? s.durationMinutes);
+      total += s.durationMinutes;
     }
     return total;
   }
@@ -358,7 +392,7 @@ class DatabaseService {
         final project = _projects.get(s.projectId);
         if (project == null || !project.includeInWeeklyGoal) continue;
       }
-      total += (s.actualMinutes ?? s.durationMinutes);
+      total += s.durationMinutes;
     }
     return total;
   }
@@ -388,21 +422,21 @@ class DatabaseService {
     final sessions = getSessionsForDate(DateTime.now());
     return sessions
         .where(_isTimerSession)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getWeekMinutes() {
     final sessions = getSessionsForWeek();
     return sessions
         .where(_isTimerSession)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getMonthMinutes() {
     final sessions = getSessionsForMonth();
     return sessions
         .where(_isTimerSession)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getTodaySessions() {
@@ -421,7 +455,7 @@ class DatabaseService {
     final sessions = getSessionsForWeek().where(_isTimerSession);
     final map = <String, int>{};
     for (final s in sessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
+      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
     }
     return map;
   }
@@ -434,7 +468,7 @@ class DatabaseService {
       final day = _dayOffset(startOfWeek, i);
       final daySessions = getSessionsForDate(day).where(_isTimerSession);
       dailyMinutes[i] =
-          daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
+          daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
     }
     return dailyMinutes;
   }
@@ -449,20 +483,20 @@ class DatabaseService {
   static double getAverageSessionDuration() {
     final sessions = _sessions.values.where(_isTimerSession).toList();
     if (sessions.isEmpty) return 0;
-    final total = sessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+    final total = sessions.fold(0, (sum, s) => sum + s.durationMinutes);
     return total / sessions.length;
   }
 
   static int getProjectTodayMinutes(String projectId) {
     return getSessionsForDate(DateTime.now())
         .where((s) => _isTimerSession(s) && s.projectId == projectId)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getProjectWeekMinutes(String projectId) {
     return getSessionsForWeek()
         .where((s) => _isTimerSession(s) && s.projectId == projectId)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getProjectWeekSessions(String projectId) {
@@ -495,7 +529,7 @@ class DatabaseService {
       final daySessions = getSessionsForDate(day)
           .where((s) => _isTimerSession(s) && s.projectId == projectId);
       dailyMinutes[i] =
-          daySessions.fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes)).toDouble();
+          daySessions.fold(0, (sum, s) => sum + s.durationMinutes).toDouble();
     }
     return dailyMinutes;
   }
@@ -513,7 +547,7 @@ class DatabaseService {
     final sessions = getSessionsForWeek().where(_isTimerSession);
     final map = <String, int>{};
     for (final s in sessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
+      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
     }
     final list = <Map<String, dynamic>>[];
     for (final entry in map.entries) {
@@ -550,7 +584,7 @@ class DatabaseService {
   static int getTotalAllTimeMinutes() {
     return _sessions.values
         .where(_isTimerSession)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   static int getTotalAllTimeSessions() {
@@ -577,7 +611,7 @@ class DatabaseService {
         } else {
           final mins = getSessionsForDate(day)
               .where(_isTimerSession)
-              .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+              .fold(0, (sum, s) => sum + s.durationMinutes);
           week.add(mins);
         }
       }

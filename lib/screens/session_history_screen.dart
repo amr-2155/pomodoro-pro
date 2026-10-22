@@ -253,7 +253,7 @@ class _SessionHistoryScreenState extends State<SessionHistoryScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      fmtMin(session.actualMinutes ?? session.durationMinutes),
+                      fmtMin(session.durationMinutes),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

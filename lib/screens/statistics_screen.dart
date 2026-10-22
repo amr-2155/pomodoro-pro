@@ -42,21 +42,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
     return _filteredSessions(projectId: _filterProjectId, since: startOfDay)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   int _filteredWeekMinutes() {
     final now = DateTime.now();
     final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday + 1) % 7));
     return _filteredSessions(projectId: _filterProjectId, since: startOfWeek)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   int _filteredMonthMinutes() {
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     return _filteredSessions(projectId: _filterProjectId, since: startOfMonth)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   int _filteredTodaySessions() {
@@ -80,7 +80,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             s.sessionType != 'tasbeeh' &&
             s.date.year == lastMonth.year &&
             s.date.month == lastMonth.month)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   int _getLastWeekMinutes() {
@@ -94,7 +94,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             s.sessionType != 'tasbeeh' &&
             !s.date.isBefore(lastWeekStart) &&
             s.date.isBefore(thisWeekStart))
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   @override
@@ -475,7 +475,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               Text(
                                 s.sessionType == 'tasbeeh'
                                     ? '${l10n.tasbeehType} • ${s.count ?? 0} ${l10n.timesWord}'
-                                    : '${(s.actualMinutes ?? s.durationMinutes)}${l10n.minShort}',
+                                    : '${s.durationMinutes}${l10n.minShort}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -1372,7 +1372,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       final d = s.date;
       final key = '${d.year}-${d.month}-${d.day}';
       result[key] =
-          (result[key] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
+          (result[key] ?? 0) + s.durationMinutes;
     }
     return result;
   }
@@ -1396,7 +1396,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   int _getFilteredTotalMinutes() {
     return _filteredSessions(projectId: _filterProjectId)
-        .fold(0, (sum, s) => sum + (s.actualMinutes ?? s.durationMinutes));
+        .fold(0, (sum, s) => sum + s.durationMinutes);
   }
 
   int _getFilteredTotalSessions() {
@@ -1412,7 +1412,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final weekSessions = sessions.where((s) => !s.date.isBefore(startOfWeek));
     final map = <String, int>{};
     for (final s in weekSessions) {
-      map[s.projectId] = (map[s.projectId] ?? 0) + (s.actualMinutes ?? s.durationMinutes);
+      map[s.projectId] = (map[s.projectId] ?? 0) + s.durationMinutes;
     }
     final list = <Map<String, dynamic>>[];
     for (final entry in map.entries) {

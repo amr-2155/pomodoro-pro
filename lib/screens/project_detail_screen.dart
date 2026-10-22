@@ -599,7 +599,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        fmtMin(session.actualMinutes ?? session.durationMinutes),
+                        fmtMin(session.durationMinutes),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

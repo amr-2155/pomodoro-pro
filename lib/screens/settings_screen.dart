@@ -681,7 +681,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final d = s.date;
       final day =
           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      csv.writeln('$day,$projectName,${s.actualMinutes ?? s.durationMinutes},${s.completed},${s.sessionType},$rating,$notes');
+csv.writeln('$day,$projectName,${s.durationMinutes},${s.completed},${s.sessionType},$rating,$notes');
     }
     csv.writeln('');
     csv.writeln('=== TASKS ===');
