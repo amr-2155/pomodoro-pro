@@ -513,16 +513,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+        return Material(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 const SheetHandleBar(),
                 const SizedBox(height: 8),
                 ListTile(
@@ -584,7 +584,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     _confirmDelete(project);
                   },
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>يستخدم التطبيق الميكروفون للعدّ الصوتي للأذكار والتسبيح أثناء جلسة التركيز.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>يستخدم التطبيق التعرّف على الصوت لعدّ تكرارات الذكر تلقائيًا بدلًا من الضغط اليدوي.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

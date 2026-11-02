@@ -384,20 +384,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: _cardDecoration(isDark),
-      child: SwitchListTile(
-        title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-        subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-        value: value,
-        onChanged: (v) {
-          DatabaseService.setSetting(settingKey, v);
-          if (settingKey == 'darkMode') {
-            DatabaseService.darkModeNotifier.value = v;
-          }
-          setState(() {});
-        },
-        activeThumbColor: AppColors.primary,
-        contentPadding: EdgeInsets.zero,
-        dense: true,
+      // The card background is painted by the Container decoration above, so
+      // the tile needs its own transparent Material ancestor for its ink
+      // splashes (otherwise Flutter asserts in debug mode).
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+          value: value,
+          onChanged: (v) {
+            DatabaseService.setSetting(settingKey, v);
+            if (settingKey == 'darkMode') {
+              DatabaseService.darkModeNotifier.value = v;
+            }
+            setState(() {});
+          },
+          activeThumbColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+        ),
       ),
     );
   }
@@ -692,7 +698,10 @@ csv.writeln('$day,$projectName,${s.durationMinutes},${s.completed},${s.sessionTy
       final desc = _csvEscape(t.description ?? '');
       csv.writeln('${_csvEscape(t.title)},$projectName,${t.priorityLabel},${t.estimatedPomodoros},${t.completedPomodoros},${t.isDone},$desc');
     }
-    Share.share(csv.toString(), subject: 'Pomodoro Data Export');
+    SharePlus.instance.share(ShareParams(
+      text: csv.toString(),
+      subject: 'Pomodoro Data Export',
+    ));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Data exported!'),
@@ -889,39 +898,42 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                       color: isSelected ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
                     ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    leading: Text(item.icon, style: const TextStyle(fontSize: 22)),
-                    title: Text(item.name, style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected ? AppColors.primary : null,
-                    )),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      GestureDetector(
-                        onTap: () => _toggle(index),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 36, height: 36,
-                          decoration: BoxDecoration(
-                            color: isPlaying
-                                ? AppColors.error.withValues(alpha: 0.1)
-                                : AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                            color: isPlaying ? AppColors.error : AppColors.primary, size: 20,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      leading: Text(item.icon, style: const TextStyle(fontSize: 22)),
+                      title: Text(item.name, style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected ? AppColors.primary : null,
+                      )),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        GestureDetector(
+                          onTap: () => _toggle(index),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: isPlaying
+                                  ? AppColors.error.withValues(alpha: 0.1)
+                                  : AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                              color: isPlaying ? AppColors.error : AppColors.primary, size: 20,
+                            ),
                           ),
                         ),
-                      ),
-                      if (isSelected) ...[const SizedBox(width: 6),
-                        const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
-                    ]),
-                    onTap: () {
-                      widget.onStopPreview();
-                      Navigator.pop(context, {'selected': item.type});
-                    },
+                        if (isSelected) ...[const SizedBox(width: 6),
+                          const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
+                      ]),
+                      onTap: () {
+                        widget.onStopPreview();
+                        Navigator.pop(context, {'selected': item.type});
+                      },
+                    ),
                   ),
                 );
               },
@@ -1026,36 +1038,39 @@ class _CountdownPickerSheetState extends State<_CountdownPickerSheet> {
                       color: isSelected ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
                     ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    leading: Text(type.icon, style: const TextStyle(fontSize: 22)),
-                    title: Text(type.nameAr, style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected ? AppColors.primary : null,
-                    )),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      GestureDetector(
-                        onTap: () => _toggle(type),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 36, height: 36,
-                          decoration: BoxDecoration(
-                            color: isPlaying
-                                ? AppColors.error.withValues(alpha: 0.1)
-                                : AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                            color: isPlaying ? AppColors.error : AppColors.primary, size: 20,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      leading: Text(type.icon, style: const TextStyle(fontSize: 22)),
+                      title: Text(type.nameAr, style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected ? AppColors.primary : null,
+                      )),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        GestureDetector(
+                          onTap: () => _toggle(type),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: isPlaying
+                                  ? AppColors.error.withValues(alpha: 0.1)
+                                  : AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                              color: isPlaying ? AppColors.error : AppColors.primary, size: 20,
+                            ),
                           ),
                         ),
-                      ),
-                      if (isSelected) ...[const SizedBox(width: 6),
-                        const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
-                    ]),
-                    onTap: () => setState(() => _selectedType = type),
+                        if (isSelected) ...[const SizedBox(width: 6),
+                          const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18)],
+                      ]),
+                      onTap: () => setState(() => _selectedType = type),
+                    ),
                   ),
                 );
               },

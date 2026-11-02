@@ -44,6 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android Gradle build output (the root /build/ rule does not cover this)
+/android/build/
+
 # Local archives
 lib.zip
 

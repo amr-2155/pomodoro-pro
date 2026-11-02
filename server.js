@@ -18,11 +18,24 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
-  let urlPath = req.url.split('?')[0];
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch {
+    res.writeHead(400);
+    res.end('Bad Request');
+    return;
+  }
   if (urlPath === '/') urlPath = '/index.html';
-  
-  const filePath = path.join(webDir, urlPath);
-  
+
+  // Resolve inside build/web and refuse anything that escapes it, so a request
+  // such as "/../../.env" can never read files outside the built app.
+  const filePath = path.resolve(webDir, '.' + urlPath);
+  if (!filePath.startsWith(webDir + path.sep)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
   fs.readFile(filePath, (err, data) => {
     if (err) {
       fs.readFile(path.join(webDir, 'index.html'), (err2, fallback) => {

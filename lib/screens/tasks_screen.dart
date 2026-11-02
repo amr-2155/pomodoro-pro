@@ -772,13 +772,14 @@ class _TasksScreenState extends State<TasksScreen>
     return ReorderableListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
       itemCount: activeTasks.length,
-      onReorder: (oldIndex, newIndex) {
+      onReorderItem: (oldIndex, newIndex) {
         // The old code did `_filteredActiveTasks.removeAt(...)` on a *getter*,
         // which rebuilds a brand-new list on every access — so the drag was
         // applied to a throw-away copy and silently discarded on the next
         // build. Write the new order onto the tasks themselves instead, then
         // switch the sort so nothing re-sorts them behind the user's back.
-        if (newIndex > oldIndex) newIndex--;
+        // `onReorderItem` already reports the adjusted target index, so no
+        // manual `newIndex--` correction is needed here.
         final reordered = [...activeTasks];
         final item = reordered.removeAt(oldIndex);
         reordered.insert(newIndex, item);
@@ -1257,72 +1258,73 @@ class _TasksScreenState extends State<TasksScreen>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Text(AppLocalizations.of(context).assignToProject,
-                  style:
-                      const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.close_rounded,
-                      size: 18, color: Colors.grey),
-                ),
-                title: Text(AppLocalizations.of(context).noProject),
-                onTap: () {
-                  setState(() => _selectedProjectId = null);
-                  Navigator.pop(ctx);
-                },
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              ...projects.map((p) {
-                final color = Color(p.colorValue);
-                return ListTile(
+        return Material(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 16),
+                Text(AppLocalizations.of(context).assignToProject,
+                    style:
+                        const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                ListTile(
                   leading: Container(
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
+                        color: Colors.grey.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8)),
-                    child: Center(
-                        child: Text(p.icon,
-                            style: const TextStyle(fontSize: 18))),
+                    child: const Icon(Icons.close_rounded,
+                        size: 18, color: Colors.grey),
                   ),
-                  title: Text(p.name),
-                  trailing: _selectedProjectId == p.id
-                      ? Icon(Icons.check_circle_rounded,
-                          color: color, size: 20)
-                      : null,
+                  title: Text(AppLocalizations.of(context).noProject),
                   onTap: () {
-                    setState(() => _selectedProjectId = p.id);
+                    setState(() => _selectedProjectId = null);
                     Navigator.pop(ctx);
                   },
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
-                );
-              }),
-            ],
+                ),
+                ...projects.map((p) {
+                  final color = Color(p.colorValue);
+                  return ListTile(
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Center(
+                          child: Text(p.icon,
+                              style: const TextStyle(fontSize: 18))),
+                    ),
+                    title: Text(p.name),
+                    trailing: _selectedProjectId == p.id
+                        ? Icon(Icons.check_circle_rounded,
+                            color: color, size: 20)
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedProjectId = p.id);
+                      Navigator.pop(ctx);
+                    },
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  );
+                }),
+              ],
+              ),
           ),
         );
       },
@@ -1334,100 +1336,101 @@ class _TasksScreenState extends State<TasksScreen>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Text(
-                task.title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
+        return Material(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 16),
+                Text(
+                  task.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              _optionTile(
-                icon: Icons.edit_rounded,
-                label: AppLocalizations.of(context).editTask,
-                color: AppColors.primary,
-                isDark: isDark,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showEditTaskDialog(task);
-                },
-              ),
-              if (!task.isDone) ...[
+                const SizedBox(height: 16),
                 _optionTile(
-                  icon: Icons.play_arrow_rounded,
-                  label: AppLocalizations.of(context).focusOnTask,
-                  color: AppColors.focusColor,
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _startFocusOnTask(task, isDark);
-                  },
-                ),
-                _optionTile(
-                  icon: Icons.today_rounded,
-                  label: AppLocalizations.of(context).keepForTomorrow,
-                  color: AppColors.warning,
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    final tomorrow = DateTime.now()
-                        .add(const Duration(days: 1));
-                    _moveTaskToDate(task, tomorrow);
-                  },
-                ),
-                _optionTile(
-                  icon: Icons.check_circle_rounded,
-                  label: AppLocalizations.of(context).markDone,
-                  color: AppColors.success,
-                  isDark: isDark,
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _toggleTask(task);
-                  },
-                ),
-              ],
-              if (task.isDone)
-                _optionTile(
-                  icon: Icons.replay_rounded,
-                  label: AppLocalizations.of(context).markNotDone,
+                  icon: Icons.edit_rounded,
+                  label: AppLocalizations.of(context).editTask,
                   color: AppColors.primary,
                   isDark: isDark,
                   onTap: () {
                     Navigator.pop(ctx);
-                    _toggleTask(task);
+                    _showEditTaskDialog(task);
                   },
                 ),
-              _optionTile(
-                icon: Icons.delete_outline_rounded,
-                label: AppLocalizations.of(context).deleteTask,
-                color: AppColors.error,
-                isDark: isDark,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _deleteTask(task);
-                },
+                if (!task.isDone) ...[
+                  _optionTile(
+                    icon: Icons.play_arrow_rounded,
+                    label: AppLocalizations.of(context).focusOnTask,
+                    color: AppColors.focusColor,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _startFocusOnTask(task, isDark);
+                    },
+                  ),
+                  _optionTile(
+                    icon: Icons.today_rounded,
+                    label: AppLocalizations.of(context).keepForTomorrow,
+                    color: AppColors.warning,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      final tomorrow = DateTime.now()
+                          .add(const Duration(days: 1));
+                      _moveTaskToDate(task, tomorrow);
+                    },
+                  ),
+                  _optionTile(
+                    icon: Icons.check_circle_rounded,
+                    label: AppLocalizations.of(context).markDone,
+                    color: AppColors.success,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _toggleTask(task);
+                    },
+                  ),
+                ],
+                if (task.isDone)
+                  _optionTile(
+                    icon: Icons.replay_rounded,
+                    label: AppLocalizations.of(context).markNotDone,
+                    color: AppColors.primary,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _toggleTask(task);
+                    },
+                  ),
+                _optionTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: AppLocalizations.of(context).deleteTask,
+                  color: AppColors.error,
+                  isDark: isDark,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _deleteTask(task);
+                  },
+                ),
+              ],
               ),
-            ],
           ),
         );
       },

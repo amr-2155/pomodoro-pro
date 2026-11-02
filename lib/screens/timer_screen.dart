@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/timer_service.dart';
 import '../services/tasbeeh_service.dart';
+import '../services/voice_count_service.dart';
 import '../services/database_service.dart';
 import '../utils/constants.dart';
 import '../utils/number_formatter.dart';
@@ -531,37 +532,40 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(project.icon,
+                                    style: const TextStyle(fontSize: 18)),
+                              ),
                             ),
-                            child: Center(
-                              child: Text(project.icon,
-                                  style: const TextStyle(fontSize: 18)),
-                            ),
+                            title: Text(project.name,
+                                style: const TextStyle(fontWeight: FontWeight.w500)),
+                            trailing: isSelected
+                                ? Icon(Icons.check_circle, color: color, size: 22)
+                                : null,
+                            onTap: () {
+                              setState(() => _selectedProjectId = project.id);
+                              final tasbeeh = context.read<TasbeehService>();
+                              if (tasbeeh.projectId != project.id) {
+                                tasbeeh.setProject(project.id);
+                              }
+                              final timer = context.read<TimerService>();
+                              timer.setProject(project.id);
+                              if (!timer.running && timer.mode == TimerMode.focus) {
+                                timer.setDurationSeconds(TimerMode.focus, project.defaultDuration);
+                              }
+                              Navigator.pop(context);
+                            },
                           ),
-                          title: Text(project.name,
-                              style: const TextStyle(fontWeight: FontWeight.w500)),
-                          trailing: isSelected
-                              ? Icon(Icons.check_circle, color: color, size: 22)
-                              : null,
-                          onTap: () {
-                            setState(() => _selectedProjectId = project.id);
-                            final tasbeeh = context.read<TasbeehService>();
-                            if (tasbeeh.projectId != project.id) {
-                              tasbeeh.setProject(project.id);
-                            }
-                            final timer = context.read<TimerService>();
-                            timer.setProject(project.id);
-                            if (!timer.running && timer.mode == TimerMode.focus) {
-                              timer.setDurationSeconds(TimerMode.focus, project.defaultDuration);
-                            }
-                            Navigator.pop(context);
-                          },
                         ),
                       );
                     },
@@ -1419,6 +1423,7 @@ class _TasbeehView extends StatefulWidget {
 class _TasbeehViewState extends State<_TasbeehView>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulse;
+  late final VoiceCountService _voice;
   Timer? _ticker;
   bool _pressed = false;
   int _tick = 0;
@@ -1426,6 +1431,8 @@ class _TasbeehViewState extends State<_TasbeehView>
   @override
   void initState() {
     super.initState();
+    _voice = VoiceCountService();
+    _voice.addListener(_onVoiceChanged);
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 160),
@@ -1441,11 +1448,73 @@ class _TasbeehViewState extends State<_TasbeehView>
     });
   }
 
-@override
+  @override
   void dispose() {
     _ticker?.cancel();
+    _voice.removeListener(_onVoiceChanged);
+    _voice.dispose();
     _pulse.dispose();
     super.dispose();
+  }
+
+  void _onVoiceChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Mic ON/OFF: every recognized repetition is routed through the same
+  /// [_onTap] path as a finger tap (count, vibration, goal celebration,
+  /// persistence) so voice sessions behave exactly like manual ones.
+  Future<void> _toggleVoice(TasbeehService svc) async {
+    if (_voice.isActive) {
+      await _voice.stop();
+      return;
+    }
+    await _voice.start(
+      dhikrIndex: svc.dhikrIndex,
+      onCount: (times) {
+        for (var i = 0; i < times; i++) {
+          _onTap(svc);
+        }
+      },
+    );
+  }
+
+  /// One-shot mic test: hears one utterance, reports what was heard and
+  /// counts it (works for a single repetition or ten in one breath).
+  Future<void> _testVoice(TasbeehService svc) async {
+    final wasListening = _voice.isActive;
+    if (wasListening) await _voice.stop();
+    final res = await _voice.listenOnce(dhikrIndex: svc.dhikrIndex);
+    if (!mounted) return;
+    final heard = res.heard.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    if (heard.isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('لم أسمع شيئًا — اقترب من المايك وجرّب تاني 🎙️'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (res.times > 0) {
+      for (var i = 0; i < res.times; i++) {
+        _onTap(svc);
+      }
+    }
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+        res.times > 0
+            ? 'سمعت: «$heard» — اتحسب ${res.times} ✅'
+            : 'سمعت: «$heard» — مش الذكر المختار، جرّب الذكر الصح',
+      ),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  /// Keeps the recognizer aligned with the currently selected dhikr.
+  Future<void> _restartVoiceForNewDhikr(TasbeehService svc) async {
+    if (!_voice.isActive) return;
+    await _voice.stop();
+    await _toggleVoice(svc);
   }
 
   void _onTap(TasbeehService svc) {
@@ -1488,45 +1557,115 @@ class _TasbeehViewState extends State<_TasbeehView>
         ),
         const SizedBox(height: 10),
 
-        // ── Dhikr chip ──
-        GestureDetector(
-          onTap: () => _pickDhikr(svc),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: widget.isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border:
-                  Border.all(color: accent.withValues(alpha: 0.35)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withValues(alpha: widget.isDark ? 0.2 : 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  svc.currentDhikr,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
-                    color: widget.isDark ? Colors.white : Colors.black87,
+        // ── Dhikr chip + voice controls ──
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: GestureDetector(
+                onTap: () => _pickDhikr(svc),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: widget.isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border:
+                        Border.all(color: accent.withValues(alpha: 0.35)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black
+                            .withValues(alpha: widget.isDark ? 0.2 : 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          svc.currentDhikr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                widget.isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 18, color: Colors.grey[500]),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 6),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: Colors.grey[500]),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            _VoiceMicButton(
+              listening: _voice.isListening,
+              busy: _voice.status == VoiceCountStatus.starting,
+              accent: accent,
+              isDark: widget.isDark,
+              onTap: () => _toggleVoice(svc),
+            ),
+            const SizedBox(width: 6),
+            _VoiceTestButton(
+              isDark: widget.isDark,
+              accent: accent,
+              onTap: () => _testVoice(svc),
+            ),
+          ],
+        ),
+
+        // ── Voice status line (listening / result / hint) ──
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: !(_voice.isActive || _voice.message != null)
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(top: 8, left: 20, right: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _voice.isActive
+                            ? Icons.graphic_eq_rounded
+                            : Icons.info_outline_rounded,
+                        size: 14,
+                        color:
+                            _voice.isActive ? accent : Colors.grey[500],
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          _voice.isActive
+                              ? (_voice.transcript.isEmpty
+                                  ? 'سامعك… اذكر «${svc.currentDhikr}»'
+                                  : _voice.transcript)
+                              : (_voice.message ?? ''),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: _voice.isActive
+                                ? accent
+                                : Colors.grey[500],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
         ),
 
         // ── Project chip / pick hint ──
@@ -1679,7 +1818,10 @@ class _TasbeehViewState extends State<_TasbeehView>
                                 BorderRadius.circular(14),
                           ),
                           child: Text(
-                            l10n.tapToCount,
+                            _voice.isListening
+                                ? '🎙️ قل «${svc.currentDhikr}» وسيُعدّ'
+                                : l10n.tapToCount,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -1736,7 +1878,12 @@ class _TasbeehViewState extends State<_TasbeehView>
               label: l10n.endSession,
               isDark: widget.isDark,
               filled: count > 0,
-              onTap: count > 0 ? () => svc.finishAndSave() : null,
+              onTap: count > 0
+                  ? () {
+                      _voice.stop();
+                      svc.finishAndSave();
+                    }
+                  : null,
             ),
           ],
         ),
@@ -1814,12 +1961,11 @@ class _TasbeehViewState extends State<_TasbeehView>
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        return Material(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
           child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1862,6 +2008,7 @@ class _TasbeehViewState extends State<_TasbeehView>
                     onTap: () {
                       Navigator.pop(ctx);
                       svc.setDhikrIndex(i);
+                      _restartVoiceForNewDhikr(svc);
                     },
                   );
                 }),
@@ -2210,6 +2357,123 @@ Text(label,
                         : (isDark ? Colors.white70 : Colors.grey[700]),
                   )),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Voice counting controls for the tasbeeh
+// ─────────────────────────────────────────────────────────────
+class _VoiceMicButton extends StatelessWidget {
+  final bool listening;
+  final bool busy;
+  final Color accent;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _VoiceMicButton({
+    required this.listening,
+    required this.busy,
+    required this.accent,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = listening || busy;
+    final bg = listening
+        ? AppColors.error
+        : busy
+            ? accent.withValues(alpha: 0.25)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white);
+    final fg = listening
+        ? Colors.white
+        : (isDark ? Colors.white70 : accent);
+return Tooltip(
+      message: listening ? 'إيقاف الاستماع' : 'العدّ بالصوت',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: bg,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active
+                  ? (listening ? AppColors.error : accent)
+                  : accent.withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+            boxShadow: listening
+                ? [
+                    BoxShadow(
+                      color: AppColors.error.withValues(alpha: 0.45),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: busy
+              ? Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                )
+              : Icon(
+                  listening
+                      ? Icons.stop_rounded
+                      : Icons.mic_none_rounded,
+                  size: 20,
+                  color: fg,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceTestButton extends StatelessWidget {
+  final bool isDark;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _VoiceTestButton({
+    required this.isDark,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'اختبار الصوت — قُل الذكر مرة وسيُحسب',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: accent.withValues(alpha: 0.25)),
+          ),
+          child: Icon(
+            Icons.graphic_eq_rounded,
+            size: 19,
+            color: isDark ? Colors.white70 : Colors.grey[600],
           ),
         ),
       ),

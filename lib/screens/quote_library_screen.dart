@@ -272,7 +272,7 @@ class _QuoteLibraryScreenState extends State<QuoteLibraryScreen> {
                                 },
                               ),
                               const SizedBox(width: 4),
-                              _QuoteAction(icon: Icons.share_outlined, color: Colors.grey[500]!, onTap: () => Share.share(text)),
+                              _QuoteAction(icon: Icons.share_outlined, color: Colors.grey[500]!, onTap: () => SharePlus.instance.share(ShareParams(text: text))),
                             ],
                           ),
                         ],
