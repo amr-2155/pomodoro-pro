@@ -23,7 +23,7 @@ class CompletionOverlay extends StatefulWidget {
 
 class _CompletionOverlayState extends State<CompletionOverlay> {
   void _onDismiss() {
-    print('COMPLETE|Overlay _onDismiss tapped');
+    debugPrint('COMPLETE|Overlay _onDismiss tapped');
     AudioService.stopCompletionLoop();
     context.read<TimerService>().stopCompletionLoop();
     context.read<SessionManager>().consume();
@@ -51,7 +51,8 @@ class _CompletionOverlayState extends State<CompletionOverlay> {
     final sm = context.watch<SessionManager>();
     final data = sm.completionData;
     if (sm.completionPending && data != null) {
-      print('COMPLETE|Overlay build showing card session=${data['sessionId']}');
+      debugPrint(
+          'COMPLETE|Overlay build showing card session=${data['sessionId']}');
     }
 
     return Stack(

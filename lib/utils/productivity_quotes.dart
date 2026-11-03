@@ -104,35 +104,35 @@ class ProductivityQuotes {
   // ══════════════════════════════════════════════════════════
 
   // G1: virtue comparisons (a > b)
-  static const _cmpA_ar = [
+  static const _cmpAAr = [
     'الصبر', 'الاستمرارية', 'الهدوء', 'الجودة', 'البداية', 'الإتقان',
     'الوضوح', 'العمق', 'الراحة المدروسة', 'الحركة', 'التخطيط',
     'المراجعة', 'الشجاعة', 'التواضع',
   ];
-  static const _cmpA_en = [
+  static const _cmpAEn = [
     'Patience', 'Consistency', 'Calm', 'Quality', 'Starting', 'Mastery',
     'Clarity', 'Depth', 'Smart rest', 'Movement', 'Planning',
     'Review', 'Courage', 'Humility',
   ];
-  static const _cmpB_ar = [
+  static const _cmpBAr = [
     'السرعة', 'الكمال', 'الضجيج', 'الكم', 'التأجيل', 'العشوائية',
     'التشتت', 'السطحية', 'الإجهاد', 'الجمود', 'المبالغة',
     'المقارنة', 'انتظار اللحظة المثالية',
   ];
-  static const _cmpB_en = [
+  static const _cmpBEn = [
     'speed', 'perfection', 'noise', 'quantity', 'procrastination',
     'randomness', 'distraction', 'shallowness', 'burnout', 'rigidity',
     'exaggeration', 'comparison', 'waiting for the perfect moment',
   ];
 
   // G2: best-time-is-now actions
-  static const _nowAct_ar = [
+  static const _nowActAr = [
     'القراءة', 'الكتابة', 'المذاكرة', 'الرياضة', 'المشي', 'التخطيط',
     'المراجعة', 'الحفظ', 'التدريب', 'ترتيب مكتبك', 'البرمجة',
     'التصميم', 'التدوين', 'العناية بصحتك', 'تعلم مهارة', 'تجربة فكرة',
     'إنهاء مهمة مؤجلة', 'الاتصال بعزيز', 'التأمل الهادئ', 'شرب الماء',
   ];
-  static const _nowAct_en = [
+  static const _nowActEn = [
     'read', 'write', 'study', 'exercise', 'walk', 'plan', 'review',
     'memorize', 'practice', 'tidy your desk', 'code', 'design',
     'journal', 'care for your health', 'learn a skill', 'test an idea',
@@ -157,23 +157,23 @@ class ProductivityQuotes {
   ];
 
   // G4: swap-for-25-minutes
-  static const _swapBad_ar = [
+  static const _swapBadAr = [
     'تصفح بلا هدف', 'أخبار سلبية', 'مقارنة نفسك بغيرك', 'انتظار الحافز',
     'تعدد المهام', 'تأجيل الصغير', 'كمالية البداية', 'ضجيج المجموعات',
     'الشكوى من ضيق الوقت', 'البحث عن أداة أفضل',
   ];
-  static const _swapBad_en = [
+  static const _swapBadEn = [
     'mindless scrolling', 'negative news', 'comparing yourself to others',
     'waiting for motivation', 'multitasking', 'delaying the small stuff',
     'perfectionist starts', 'group-chat noise',
     'complaining about time', 'hunting for a better tool',
   ];
-  static const _swapGood_ar = [
+  static const _swapGoodAr = [
     'جلسة عمل عميقة', 'مشي قصير', 'كتابة بخط اليد', 'تنفس بطيء',
     'مهمة واحدة فقط', 'تنظيم مساحة عملك', 'تعلم مصغر', 'استراحة حقيقية',
     'كوب ماء', 'نوم مبكر',
   ];
-  static const _swapGood_en = [
+  static const _swapGoodEn = [
     'deep work', 'a short walk', 'writing by hand', 'slow breathing',
     'one single task', 'organizing your workspace', 'micro-learning',
     'a real break', 'a glass of water', 'an early night',
@@ -214,22 +214,22 @@ class ProductivityQuotes {
     }
 
     // G1 — comparisons (skip identical index & known duplicate).
-    for (var i = 0; i < _cmpA_ar.length; i++) {
-      for (var j = 0; j < _cmpB_ar.length; j++) {
-        if (i == j && i < _cmpB_ar.length - 1) continue;
-        if (_cmpA_en[i] == 'Consistency' && _cmpB_en[j] == 'perfection') {
+    for (var i = 0; i < _cmpAAr.length; i++) {
+      for (var j = 0; j < _cmpBAr.length; j++) {
+        if (i == j && i < _cmpBAr.length - 1) continue;
+        if (_cmpAEn[i] == 'Consistency' && _cmpBEn[j] == 'perfection') {
           continue; // covered verbatim by c1
         }
-        add(focus, '${_cmpA_ar[i]} أهم من ${_cmpB_ar[j]}.',
-            '${_cmpA_en[i]} beats ${_cmpB_en[j]}.');
+        add(focus, '${_cmpAAr[i]} أهم من ${_cmpBAr[j]}.',
+            '${_cmpAEn[i]} beats ${_cmpBEn[j]}.');
       }
     }
 
     // G2 — best-time-is-now.
-    for (var i = 0; i < _nowAct_ar.length; i++) {
+    for (var i = 0; i < _nowActAr.length; i++) {
       add(work,
-          'أفضل وقت ل${_nowAct_ar[i]} هو الآن.',
-          'The best time to ${_nowAct_en[i]} is now.');
+          'أفضل وقت ل${_nowActAr[i]} هو الآن.',
+          'The best time to ${_nowActEn[i]} is now.');
     }
 
     // G3 — small step today.
@@ -240,11 +240,11 @@ class ProductivityQuotes {
     }
 
     // G4 — swap for 25 minutes.
-    for (var b = 0; b < _swapBad_ar.length; b++) {
-      for (var g = 0; g < _swapGood_ar.length; g++) {
+    for (var b = 0; b < _swapBadAr.length; b++) {
+      for (var g = 0; g < _swapGoodAr.length; g++) {
         add(discipline,
-            'بدل ${_swapBad_ar[b]}، خصص 25 دقيقة لـ${_swapGood_ar[g]}.',
-            'Instead of ${_swapBad_en[b]}, spend 25 minutes on ${_swapGood_en[g]}.');
+            'بدل ${_swapBadAr[b]}، خصص 25 دقيقة لـ${_swapGoodAr[g]}.',
+            'Instead of ${_swapBadEn[b]}, spend 25 minutes on ${_swapGoodEn[g]}.');
       }
     }
 
