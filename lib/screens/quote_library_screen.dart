@@ -126,7 +126,13 @@ class _QuoteLibraryScreenState extends State<QuoteLibraryScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // Safe now: the sheet (and with it every TextField still listening to
+      // these controllers) has been removed from the tree.
+      arCtrl.dispose();
+      enCtrl.dispose();
+      authorCtrl.dispose();
+    });
   }
 
   void _confirmDelete(Map<String, String> q) {

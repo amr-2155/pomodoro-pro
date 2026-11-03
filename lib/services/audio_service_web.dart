@@ -83,24 +83,36 @@ class AudioService {
   }
 
   /// [type] is null when the user disabled the completion sound in Settings —
-  /// silence in that case, never a fallback to a default tone.
+  /// silence in that case, never a fallback to a default tone. Vibration is
+  /// independent of the sound and still runs (as it does on mobile).
   static Future<void> startCompletionLoop([CompletionSoundType? type]) async {
+    _completionLooping = true;
+    _startVibrationLoop();
     if (type == null) {
-      _completionLooping = false;
-      _vibrationTimer?.cancel();
-      _vibrationTimer = null;
       await _stopElement(_completionElement);
       return;
     }
     await _stopElement(_completionElement);
     final url = await _getUrl(type.asset);
     if (url == null) return;
-    _completionLooping = true;
     _completionElement = web.HTMLAudioElement()
       ..src = url
       ..volume = 0.9
       ..loop = true;
     await _completionElement!.play().toDart;
+  }
+
+  /// Mirrors the mobile implementation: a repeating strong vibration that
+  /// runs for as long as [_completionLooping] is true.
+  static void _startVibrationLoop() {
+    _vibrationTimer?.cancel();
+    if (!DatabaseService.completionVibrationEnabled) return;
+    try {
+      unawaited(VibrationService.vibrate(duration: 400));
+      _vibrationTimer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
+        if (_completionLooping) VibrationService.vibrate(duration: 400);
+      });
+    } catch (_) {}
   }
 
   static Future<void> stopCompletionLoop() async {
@@ -155,5 +167,13 @@ class AudioService {
 
   static Future<void> dispose() async {
     await stopAllSounds();
+    // Blob URLs are process-wide and never garbage collected on their own;
+    // leaking one per previewed sound adds up over a long session.
+    for (final url in _urlCache.values) {
+      try {
+        web.URL.revokeObjectURL(url);
+      } catch (_) {}
+    }
+    _urlCache.clear();
   }
 }

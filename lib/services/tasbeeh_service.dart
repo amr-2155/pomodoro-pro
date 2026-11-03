@@ -103,13 +103,17 @@ class TasbeehService extends ChangeNotifier {
   }
 
   void setProject(String? pid) {
+    final next = pid ?? '';
     if (_active && _count > 0) {
-      // Project changed mid-session: bank what we have first.
+      // Project changed mid-session: bank what we have first, then apply the
+      // new selection. Returning here without assigning `next` left the
+      // counter running under the OLD project while the rest of the UI showed
+      // the new one.
       finishAndSave();
-      return;
     }
-    _projectId = pid ?? '';
-    DatabaseService.setSetting(_kProjectId, _projectId);
+    _projectId = next;
+    DatabaseService.setSetting(_kProjectId, next);
+    notifyListeners();
   }
 
   void tap() {

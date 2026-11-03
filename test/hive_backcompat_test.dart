@@ -7,6 +7,7 @@ import 'package:hive/src/binary/binary_reader_impl.dart';
 import 'package:hive/src/binary/binary_writer_impl.dart';
 import 'package:hive/src/registry/type_registry_impl.dart';
 import 'package:pomodoro_app/models/day_goal.dart';
+import 'package:pomodoro_app/models/project.dart';
 import 'package:pomodoro_app/models/stage_item.dart';
 import 'package:pomodoro_app/models/task.dart';
 
@@ -29,10 +30,44 @@ TypeRegistryImpl _registry() {
     ..registerAdapter(DateTimeWithTimezoneAdapter())
     ..registerAdapter(DateTimeAdapter<DateTimeWithoutTZ>());
   r
+    ..registerAdapter(ProjectAdapter())
     ..registerAdapter(TaskAdapter())
     ..registerAdapter(DayGoalAdapter())
     ..registerAdapter(StageItemAdapter());
   return r;
+}
+
+/// Encodes a Project the way an OLD build did: 12 fields, none of
+/// dailyGoalMinutes (12) / includeInWeeklyGoal (13) / tasbeehGoal (14).
+Uint8List _encodeLegacyProject(TypeRegistry registry) {
+  final w = BinaryWriterImpl(registry);
+  w
+    ..writeByte(12) // numOfFields — the old shape
+    ..writeByte(0)
+    ..write('legacy-project')
+    ..writeByte(1)
+    ..write('مشروع قديم')
+    ..writeByte(2)
+    ..write(0xFF6C63FF)
+    ..writeByte(3)
+    ..write('🎯')
+    ..writeByte(4)
+    ..write(DateTime.fromMillisecondsSinceEpoch(1700000000000))
+    ..writeByte(5)
+    ..write(7)
+    ..writeByte(6)
+    ..write(210)
+    ..writeByte(7)
+    ..write(false)
+    ..writeByte(8)
+    ..write('')
+    ..writeByte(9)
+    ..write(300)
+    ..writeByte(10)
+    ..write(1500)
+    ..writeByte(11)
+    ..write('default');
+  return w.toBytes();
 }
 
 /// Encodes a Task the way an OLD build did: 9 fields, no sortOrder.
@@ -79,6 +114,42 @@ void main() {
         reason: 'a field absent from old bytes must default, never throw');
   });
 
+  test('legacy Project (12 fields) reads with the new fields defaulted', () {
+    final bytes = _encodeLegacyProject(registry);
+    final project = ProjectAdapter().read(BinaryReaderImpl(bytes, registry));
+
+    expect(project.id, 'legacy-project');
+    expect(project.name, 'مشروع قديم');
+    expect(project.totalSessions, 7);
+    expect(project.totalMinutes, 210);
+    expect(project.weeklyGoalMinutes, 300);
+    expect(project.defaultDuration, 1500);
+    expect(project.dailyGoalMinutes, 0,
+        reason: 'a field absent from old bytes must default, never throw');
+    expect(project.includeInWeeklyGoal, isTrue);
+    expect(project.tasbeehGoal, 0);
+  });
+
+  test('current Project round-trips through the real writer and reader', () {
+    final w = BinaryWriterImpl(registry);
+    final original = Project(
+      id: 'p1',
+      name: 'مشروع',
+      colorValue: 0xFF112233,
+      dailyGoalMinutes: 45,
+      includeInWeeklyGoal: false,
+      tasbeehGoal: 100,
+    );
+    ProjectAdapter().write(w, original);
+    final back = ProjectAdapter().read(BinaryReaderImpl(w.toBytes(), registry));
+
+    expect(back.id, 'p1');
+    expect(back.name, 'مشروع');
+    expect(back.dailyGoalMinutes, 45);
+    expect(back.includeInWeeklyGoal, isFalse);
+    expect(back.tasbeehGoal, 100);
+  });
+
   test('current Task round-trips through the real writer and reader', () {
     final w = BinaryWriterImpl(registry);
     final original = Task(
@@ -118,6 +189,7 @@ void main() {
   });
 
   test('adapter typeIds are stable and unique', () {
+    expect(ProjectAdapter().typeId, 0);
     expect(TaskAdapter().typeId, 2);
     expect(StageItemAdapter().typeId, 3);
     expect(DayGoalAdapter().typeId, 4);

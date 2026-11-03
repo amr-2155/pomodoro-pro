@@ -35,6 +35,10 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
   /// by then the element is defunct and an ancestor lookup would throw.
   TimerService? _timerService;
 
+  /// The handler that was installed before this screen took over
+  /// `onBreakStart`, restored on dispose.
+  void Function(int breakSeconds)? _previousOnBreakStart;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +83,11 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
       if (!mounted) return;
       final timer = context.read<TimerService>();
       _timerService = timer;
+      // Remember the handler TimerScreen installed so it can be restored on
+      // dispose — nulling it out here disabled the break screen for every
+      // later focus session on the timer tab (TimerScreen lives in an
+      // IndexedStack and never re-runs initState).
+      _previousOnBreakStart = timer.onBreakStart;
       timer.onBreakStart = _onBreakStart;
       timer.setProject(widget.project.id);
       timer.setDurationSeconds(TimerMode.focus, widget.project.defaultDuration);
@@ -90,7 +99,9 @@ class _ImmersiveFocusScreenState extends State<ImmersiveFocusScreen>
   void dispose() {
     // Use the captured reference: `context` is unusable once the element has
     // been unmounted (Flutter throws "deactivated widget's ancestor").
-    _timerService?.onBreakStart = null;
+    if (_timerService?.onBreakStart == _onBreakStart) {
+      _timerService!.onBreakStart = _previousOnBreakStart;
+    }
     _timerService = null;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _fadeController.dispose();

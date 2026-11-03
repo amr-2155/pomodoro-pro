@@ -2046,6 +2046,10 @@ class _TasbeehViewState extends State<_TasbeehView>
   }
 
   void _showGoalSheet(TasbeehService svc, int currentGoal) {
+    // Created once, outside the builder: a controller built inside `builder`
+    // is recreated on every rebuild of the sheet and leaks each time.
+    final ctrl =
+        TextEditingController(text: currentGoal > 0 ? '$currentGoal' : '');
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2053,8 +2057,6 @@ class _TasbeehViewState extends State<_TasbeehView>
       builder: (ctx) {
         final l10n = AppLocalizations.of(ctx);
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final ctrl = TextEditingController(
-            text: currentGoal > 0 ? '$currentGoal' : '');
         return Padding(
           padding:
               EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
@@ -2147,7 +2149,7 @@ class _TasbeehViewState extends State<_TasbeehView>
           ),
         );
       },
-    );
+    ).whenComplete(ctrl.dispose);
   }
 }
 

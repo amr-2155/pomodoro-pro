@@ -780,7 +780,11 @@ class DatabaseService {
     // Daily goals, carry-over minutes and stage plans live in their own box.
     // Leaving them behind meant a "reset" still showed the old goal rings.
     await _dayGoals.clear();
+    // Custom/edited quotes live in their own box; leaving them behind meant a
+    // "reset all data" still showed the user's own quotes everywhere.
+    await _customQuotes.clear();
     await _settings.clear();
+    customQuotesRevision.value++;
     darkModeNotifier.value = false;
     zoomNotifier.value = 1.0;
     // Reset the language notifier too: _settings.clear() deleted the
@@ -826,9 +830,23 @@ class DatabaseService {
         'projectId': v.projectId,
         'priority': v.priority,
         'description': v.description,
+        // Manual drag-and-drop order. Omitting it made every task snap back
+        // to the unsorted default after a backup round-trip.
+        'sortOrder': v.sortOrder,
       })),
       'settings': _settings.toMap(),
       'dayGoals': _dayGoals.toMap().map((k, v) => MapEntry(k, v.toMap())),
+      // Custom/edited quotes. Omitting them silently destroyed every
+      // user-authored quote on a restore to another device.
+      'customQuotes': _customQuotes.toMap().map(
+            (k, v) => MapEntry(
+              k.toString(),
+              v is Map
+                  ? v.map(
+                      (ik, iv) => MapEntry(ik.toString(), iv.toString()))
+                  : <String, String>{},
+            ),
+          ),
     };
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -920,6 +938,9 @@ class DatabaseService {
               projectId: t['projectId'],
               priority: (t['priority'] as num?)?.toInt() ?? 0,
               description: t['description'],
+              // Without this the manual drag-and-drop order was silently
+              // discarded on every restore.
+              sortOrder: (t['sortOrder'] as num?)?.toInt() ?? -1,
             ),
           ));
         } catch (_) {}
@@ -940,6 +961,26 @@ class DatabaseService {
       }
     }
 
+    // Custom/edited quotes: stored as a map of string fields per quote id.
+    final quoteRecords = <MapEntry<String, Map<String, String>>>[];
+    final quotes = decoded['customQuotes'];
+    if (quotes is Map) {
+      for (final entry in quotes.entries) {
+        final raw = entry.value;
+        if (raw is! Map) continue;
+        final quote = <String, String>{};
+        raw.forEach((k, v) => quote[k.toString()] = v?.toString() ?? '');
+        // A quote without Arabic text is unusable (see getCustomQuotes).
+        final ar = quote['ar'] ?? '';
+        if (ar.isEmpty) continue;
+        final id = (quote['id']?.isNotEmpty ?? false)
+            ? quote['id']!
+            : entry.key.toString();
+        quote['id'] = id;
+        quoteRecords.add(MapEntry(id, quote));
+      }
+    }
+
     // Everything parsed: now write.
     for (final e in projectRecords) {
       await _projects.put(e.key, e.value);
@@ -952,6 +993,9 @@ class DatabaseService {
     }
     for (final e in dayGoalRecords) {
       await _dayGoals.put(e.key, e.value);
+    }
+    for (final e in quoteRecords) {
+      await _customQuotes.put(e.key, e.value);
     }
 
     final settings = decoded['settings'];
@@ -968,12 +1012,14 @@ class DatabaseService {
     final langCode = getSetting('language', defaultValue: 'ar');
     localeNotifier.value = Locale(langCode is String ? langCode : 'ar');
     quoteFavoritesNotifier.value = favoriteQuotes;
+    customQuotesRevision.value++;
     goalsRevision.value++;
 
     return projectRecords.length +
         sessionRecords.length +
         taskRecords.length +
-        dayGoalRecords.length;
+        dayGoalRecords.length +
+        quoteRecords.length;
   }
 
   /// Parses an ISO timestamp into local time. `DateTime.parse` keeps a UTC

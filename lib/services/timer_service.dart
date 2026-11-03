@@ -334,7 +334,9 @@ double get progress =>
       _running = false;
       _endTime = null;
       _completing = true;
-      await _completeSession(showNotification: false);
+      // Attribute the session to the moment it really ended, not to the
+      // moment the user happened to reopen the app (which can be days later).
+      await _completeSession(showNotification: false, endedAt: end);
       DebugLogger.log('RESTORE', 'AFTER _completeSession');
       notifyListeners();
     }
@@ -460,6 +462,10 @@ double get progress =>
       _stopwatchStartedAt = null;
       _clearPersistedStopwatch();
     } else {
+      // Switching away from a *paused* stopwatch must drop its persisted
+      // state too: otherwise the next launch restored stopwatch mode over the
+      // mode the user actually picked.
+      _clearPersistedStopwatch();
       _updateDurationForMode();
     }
     notifyListeners();
@@ -605,7 +611,29 @@ double get progress =>
   /// The session/task Hive writes are awaited so a session can never be
   /// lost if the process is killed moments after completion. Callers use
   /// `unawaited()` so the completion UI still renders instantly.
-  Future<void> _completeSession({required bool showNotification}) async {
+  Future<void> _completeSession({
+    required bool showNotification,
+    DateTime? endedAt,
+  }) async {
+    try {
+      await _completeSessionInner(
+        showNotification: showNotification,
+        endedAt: endedAt,
+      );
+    } finally {
+      // Always release the completion lock, even when a Hive write throws:
+      // `_finish()` early-returns while `_completing` is true, so a single
+      // failed write used to silently drop every later session.
+      _wasSkipped = false;
+      _completing = false; // ready for the next session
+      notifyListeners();
+    }
+  }
+
+  Future<void> _completeSessionInner({
+    required bool showNotification,
+    DateTime? endedAt,
+  }) async {
     _timer?.cancel();
     _running = false;
     // Always cancel any still-pending OS-scheduled notification: on
@@ -660,6 +688,9 @@ double get progress =>
       final session = Session(
         id: const Uuid().v4(),
         projectId: _currentProjectId ?? '',
+        // `endedAt` is only set when the session finished while the app was
+        // closed; `Session` falls back to "now" when it is null.
+        date: endedAt,
         durationMinutes: _totalSeconds ~/ 60,
         actualMinutes: null,
         completed: !_wasSkipped,
@@ -743,11 +774,6 @@ double get progress =>
     }
 
     _switchMode();
-
-    _wasSkipped = false;
-    _completing = false; // ready for the next session
-
-    notifyListeners();
   }
 
   // ─── Project weekly-goal completion ───

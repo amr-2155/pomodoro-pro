@@ -52,3 +52,8 @@ lib.zip
 
 # Landing site lives in its own repo (amr-2155/pomodoro-landing)
 /landing/
+
+# Local-only content that must never be committed (the first is ~1.7 GB)
+/ZATNA SPIN/
+/portfolio-site/
+/doc/

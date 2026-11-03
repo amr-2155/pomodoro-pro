@@ -450,9 +450,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         }
                         Navigator.pop(context);
                         _loadProjects();
-                        for (final c in controllers) {
-                          c.dispose();
-                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -473,7 +470,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // Safe now: the route (and with it every TextField still listening to
+      // these controllers) has been removed from the tree.
+      for (final c in controllers) {
+        c.dispose();
+      }
+    });
   }
 
   Widget _buildDurationField({

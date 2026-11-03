@@ -325,7 +325,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Safe now: the sheet has been removed, so no TextField is still
+      // listening to this controller.
+      controller.dispose();
+    });
   }
 
   Widget _buildDurationTile(String title, int value, String settingKey, {int min = 1, int max = 90}) {
