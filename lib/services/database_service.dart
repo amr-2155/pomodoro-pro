@@ -37,18 +37,40 @@ class DatabaseService {
   static bool _isFreshInstall = false;
   static bool get isFreshInstall => _isFreshInstall;
 
+  /// Guards the one-time Hive bootstrap so [init] can be retried after a
+  /// failure (the startup-recovery screen does exactly that) without
+  /// re-running `init`/`registerAdapter`, which would throw.
+  static bool _hiveInitialized = false;
+  static bool _adaptersRegistered = false;
+
+  /// Every box this service owns. Used by [wipeLocalStorage].
+  static const List<String> allBoxNames = [
+    _projectsBox,
+    _sessionsBox,
+    _tasksBox,
+    _settingsBox,
+    _dayGoalsBox,
+    _customQuotesBox,
+  ];
+
   static Future<void> init({String? hivePath}) async {
-    if (hivePath != null) {
-      Hive.init(hivePath);
-    } else {
-      await Hive.initFlutter();
+    if (!_hiveInitialized) {
+      if (hivePath != null) {
+        Hive.init(hivePath);
+      } else {
+        await Hive.initFlutter();
+      }
+      _hiveInitialized = true;
     }
 
-    Hive.registerAdapter(ProjectAdapter());
-    Hive.registerAdapter(SessionAdapter());
-    Hive.registerAdapter(TaskAdapter());
-    Hive.registerAdapter(DayGoalAdapter());
-    Hive.registerAdapter(StageItemAdapter());
+    if (!_adaptersRegistered) {
+      Hive.registerAdapter(ProjectAdapter());
+      Hive.registerAdapter(SessionAdapter());
+      Hive.registerAdapter(TaskAdapter());
+      Hive.registerAdapter(DayGoalAdapter());
+      Hive.registerAdapter(StageItemAdapter());
+      _adaptersRegistered = true;
+    }
 
     _projects = await Hive.openBox<Project>(_projectsBox);
     _sessions = await Hive.openBox<Session>(_sessionsBox);
@@ -68,6 +90,20 @@ class DatabaseService {
     zoomNotifier.value = appZoom;
     final langCode = getSetting('language', defaultValue: 'ar');
     localeNotifier.value = Locale(langCode is String ? langCode : 'ar');
+  }
+
+  /// Deletes every box this app owns, on disk (mobile/desktop) or in
+  /// IndexedDB (web). Deliberately used only by the startup-recovery screen:
+  /// it is the last resort when the store cannot be opened at all, and it
+  /// destroys all local data. Runs even for boxes that failed to open.
+  static Future<void> wipeLocalStorage() async {
+    for (final name in allBoxNames) {
+      try {
+        await Hive.deleteBoxFromDisk(name);
+      } catch (_) {
+        // Keep going: one unremovable box must not block the rest.
+      }
+    }
   }
 
   static Future<void> _migrateDurationsToSeconds() async {

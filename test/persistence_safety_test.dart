@@ -32,6 +32,13 @@ void main() {
     }
   });
 
+  test('init can be retried safely (startup-recovery path)', () async {
+    // The boot error screen calls init() again after a failure. Re-running it
+    // must not throw on already-registered adapters or already-open boxes.
+    await DatabaseService.init(hivePath: tempDir.path);
+    expect(DatabaseService.sessionCount, greaterThanOrEqualTo(0));
+  });
+
   test('setProject applies the new project when idle', () {
     final svc = TasbeehService();
     svc.setProject('p1');
