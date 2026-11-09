@@ -56,6 +56,15 @@ class VoiceCountService extends ChangeNotifier {
   bool _wantListening = false;
   bool _starting = false;
 
+  /// Last observed mic level (0..1), for far-field UI feedback.
+  double _soundLevel = 0;
+  DateTime? _lastLevelNotify;
+
+  /// Last time the engine proved it was alive (status or result).
+  DateTime _lastActivity = DateTime.now();
+
+  Timer? _watchdogTimer;
+
   /// True between a successful `listen()` and the engine's end event.
   /// Calling `start()` on a browser recognizer that is still active throws
   /// `InvalidStateError`, so this blocks duplicate session starts.
@@ -70,6 +79,7 @@ class VoiceCountService extends ChangeNotifier {
   VoiceCountStatus get status => _status;
   String get transcript => _transcript;
   String? get message => _message;
+  double get soundLevel => _soundLevel;
   bool get isListening => _status == VoiceCountStatus.listening;
   bool get isActive =>
       _status == VoiceCountStatus.listening ||
@@ -89,8 +99,11 @@ class VoiceCountService extends ChangeNotifier {
     _onCount = onCount;
     _message = null;
     _transcript = '';
+    _soundLevel = 0;
     _restartAttempts = 0;
+    _lastActivity = DateTime.now();
     _wantListening = true;
+    _startWatchdog();
     _set(VoiceCountStatus.starting);
 
     final ready = await _ensureReady();
@@ -107,6 +120,9 @@ class VoiceCountService extends ChangeNotifier {
     _sessionActive = false;
     _restartTimer?.cancel();
     _restartTimer = null;
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _soundLevel = 0;
     try {
       if (_speech.isListening) await _speech.stop();
     } catch (_) {}
@@ -180,7 +196,9 @@ class VoiceCountService extends ChangeNotifier {
           pauseFor: const Duration(seconds: 2),
           partialResults: true,
           cancelOnError: false,
+          onDevice: false,
           listenMode: ListenMode.dictation,
+          contextualPhrases: VoiceDhikrMatcher.biasPhrases(dhikrIndex),
         ),
       );
     } catch (_) {
@@ -202,6 +220,7 @@ class VoiceCountService extends ChangeNotifier {
   void dispose() {
     _wantListening = false;
     _restartTimer?.cancel();
+    _watchdogTimer?.cancel();
     try {
       _speech.cancel();
     } catch (_) {}
@@ -282,6 +301,7 @@ class VoiceCountService extends ChangeNotifier {
     try {
       await _speech.listen(
         onResult: _handleResult,
+        onSoundLevelChange: _handleSoundLevel,
         listenOptions: SpeechListenOptions(
           localeId: _localeId ?? _fallbackLocale,
           // No `listenFor`: keep listening until the engine recycles itself
@@ -289,10 +309,17 @@ class VoiceCountService extends ChangeNotifier {
           pauseFor: _pauseFor,
           partialResults: true,
           cancelOnError: false,
+          // Cloud recognition is more accurate than on-device for quiet /
+          // far speech, so force the network path.
+          onDevice: false,
           listenMode: ListenMode.dictation,
+          // Bias the recognizer toward the dhikr wording (Android 13+ /
+          // iOS). Substantially helps far-field accuracy; ignored elsewhere.
+          contextualPhrases: VoiceDhikrMatcher.biasPhrases(_dhikrIndex),
         ),
       );
       _sessionActive = true;
+      _lastActivity = DateTime.now();
       if (_wantListening) {
         _set(VoiceCountStatus.listening);
       }
@@ -302,14 +329,10 @@ class VoiceCountService extends ChangeNotifier {
       // Calling start() on an already-active recognizer is not fatal.
       if (_speech.isListening) return;
       _restartAttempts++;
-      if (_restartAttempts >= 5) {
-        _message = 'تعذّر تشغيل المايك. جرّب تحديث الصفحة أو إعادة فتح التطبيق.';
-        _stopWith(VoiceCountStatus.error);
-        return;
-      }
-      _scheduleRestartIfNeeded(
-        delay: Duration(milliseconds: 400 + 200 * _restartAttempts),
-      );
+      // Never give up: the user asked for continuous counting. Back off
+      // (capped) and keep trying until they switch the mic off.
+      _message ??= 'تعذّر تشغيل المايك… هحاول تاني لوحدي.';
+      _scheduleRestartIfNeeded(delay: _restartDelay());
     } finally {
       _starting = false;
     }
@@ -323,6 +346,7 @@ class VoiceCountService extends ChangeNotifier {
     if (heard.isEmpty) return;
 
     _transcript = heard;
+    _lastActivity = DateTime.now();
     // Any result proves the session is alive: allow future restarts.
     _restartAttempts = 0;
 
@@ -340,17 +364,70 @@ class VoiceCountService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleSoundLevel(double level) {
+    // Throttle UI updates: the engine fires this many times per second.
+    final clamped = level.clamp(0.0, 1.0).toDouble();
+    _soundLevel = clamped;
+    final now = DateTime.now();
+    if (_lastLevelNotify != null &&
+        now.difference(_lastLevelNotify!) < const Duration(milliseconds: 250)) {
+      return;
+    }
+    _lastLevelNotify = now;
+    if (_wantListening) notifyListeners();
+  }
+
+  /// Backoff for session restarts: fast when healthy, capped when the
+  /// engine keeps failing — but never zero chance to retry.
+  Duration _restartDelay() {
+    final ms = 200 + _restartAttempts * 300;
+    return Duration(milliseconds: ms.clamp(200, 3000));
+  }
+
+  /// Restarts recognition indefinitely until the user switches the mic off.
+  /// The watchdog revives the session if the engine stalls silently (no
+  /// status, no result, not listening) or if a restart was lost.
+  void _startWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) {
+        if (!_wantListening || _starting) return;
+        if (!_speech.isListening) {
+          _sessionActive = false;
+          _set(VoiceCountStatus.starting);
+          _scheduleRestartIfNeeded(
+            delay: const Duration(milliseconds: 150),
+          );
+          return;
+        }
+        // Engine claims to listen but has been silent far longer than
+        // `pauseFor` without reporting — it is stalled. Restart it.
+        final idle =
+            DateTime.now().difference(_lastActivity) > _pauseFor * 2;
+        if (idle) {
+          _sessionActive = false;
+          _scheduleRestartIfNeeded(
+            delay: const Duration(milliseconds: 150),
+          );
+        }
+      },
+    );
+  }
+
   void _handleStatus(String status) {
     if (!_wantListening) return;
     if (status == 'listening') {
       _restartAttempts = 0;
+      _lastActivity = DateTime.now();
       _set(VoiceCountStatus.listening);
     } else if (status == 'done' ||
         status == 'notListening' ||
         status == 'doneNoResult') {
       // The engine ended this session; a fresh `listen()` is allowed now.
+      // Restart quickly: every millisecond of gap is speech we can miss.
       _sessionActive = false;
-      _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 350));
+      _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 150));
     }
   }
 
@@ -363,13 +440,14 @@ class VoiceCountService extends ChangeNotifier {
         code.contains('no-speech') ||
         code.contains('speech_timeout') ||
         code == 'aborted') {
-      _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 400));
+      _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 200));
       return;
     }
 
     if (code.contains('network')) {
-      _message = 'العدّ الصوتي بيحتاج إنترنت على الجهاز ده — اتأكد من الاتصال.';
-      _stopWith(VoiceCountStatus.error);
+      // Transient: the connection may return. Keep retrying.
+      _message = 'الإنترنت ضعيف… هحاول تاني لوحدي.';
+      _scheduleRestartIfNeeded(delay: _restartDelay());
       return;
     }
 
@@ -391,8 +469,10 @@ class VoiceCountService extends ChangeNotifier {
     }
 
     if (code == 'audio-capture' || code.contains('audio_error')) {
+      // No usable mic right now (unplugged, busy, device changed). Keep
+      // retrying — the user may fix it without restarting the app.
       _message = 'مش لاقي مايك شغّال — وصّل مايك وجرّب تاني.';
-      _stopWith(VoiceCountStatus.error);
+      _scheduleRestartIfNeeded(delay: _restartDelay());
       return;
     }
 
@@ -402,7 +482,7 @@ class VoiceCountService extends ChangeNotifier {
       return;
     }
 
-    _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 500));
+    _scheduleRestartIfNeeded(delay: const Duration(milliseconds: 300));
   }
 
   void _scheduleRestartIfNeeded({Duration delay = Duration.zero}) {
@@ -410,14 +490,6 @@ class VoiceCountService extends ChangeNotifier {
     _restartTimer?.cancel();
     _restartTimer = Timer(delay, () async {
       if (!_wantListening || !_initialized) return;
-      // Restarts that keep failing (no listening status, no results) are
-      // bounded; a healthy session resets the counter on every result.
-      if (_restartAttempts >= 6) {
-        _message = 'توقّف الاستماع — اضغط المايك للتشغيل من جديد.';
-        _wantListening = false;
-        _set(VoiceCountStatus.idle);
-        return;
-      }
       await _startSession();
     });
   }
@@ -427,6 +499,8 @@ class VoiceCountService extends ChangeNotifier {
     _sessionActive = false;
     _restartTimer?.cancel();
     _restartTimer = null;
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
     // Release the microphone so the browser stops showing the recording dot.
     try {
       _speech.cancel();

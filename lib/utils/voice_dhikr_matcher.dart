@@ -14,6 +14,7 @@ class VoiceDhikrMatcher {
     0: [
       'استغفرالله',
       'استغفراللهربي',
+      'استغفراللهالعظيم',
       'استغفرلله',
       'استغفر',
     ],
@@ -31,17 +32,21 @@ class VoiceDhikrMatcher {
     2: [
       'سبحانالله',
       'سبحاناللهوبحمده',
+      'سبحاناللهالعظيم',
+      'سبحاناللهوبحمدهسبحاناللهالعظيم',
       'سبحان',
     ],
     // الحمد لله
     3: [
       'الحمدلله',
       'الحمدللهربالعالمين',
+      'الحمدللهعلىكلحال',
       'الحمد',
     ],
     // الله أكبر
     4: [
       'اللهكبر',
+      'اللهاكبر',
       'اللهواكبر',
       'اللهواكبروللهالحمد',
     ],
@@ -49,16 +54,41 @@ class VoiceDhikrMatcher {
     5: [
       'لاالهالاالله',
       'لاالهالااللهوحدهلاشريكله',
+      'لاالهالااللهالملكالحقالمبين',
       'لاالهالا',
     ],
   };
+
+  /// Spaced phrases to bias Android (API 33+) and iOS recognition toward
+  /// the dhikr. Improves accuracy for quiet/far speech; ignored elsewhere.
+  static const Map<int, List<String>> _biasPhrases = {
+    0: ['أستغفر الله', 'استغفر الله', 'أستغفر الله ربي', 'أستغفر الله العظيم'],
+    1: [
+      'اللهم صل على محمد',
+      'اللهم صلي على محمد',
+      'صلى الله على محمد',
+      'صل الله على محمد'
+    ],
+    2: ['سبحان الله', 'سبحان الله وبحمده', 'سبحان الله العظيم'],
+    3: ['الحمد لله', 'الحمد لله رب العالمين', 'الحمد لله على كل حال'],
+    4: ['الله أكبر', 'الله اكبر', 'الله أكبر ولله الحمد'],
+    5: [
+      'لا إله إلا الله',
+      'لا اله الا الله',
+      'لا إله إلا الله وحده لا شريك له'
+    ],
+  };
+
+  /// Phrases to feed the recognizer as domain hints for [dhikrIndex].
+  static List<String> biasPhrases(int dhikrIndex) =>
+      _biasPhrases[dhikrIndex] ?? const [];
 
   /// Strips diacritics/tatweel, unifies letter forms and keeps Arabic
   /// letters only, then collapses whitespace.
   static String normalize(String input) {
     var s = input;
-    // Diacritics, sukun, dagger alif, tatweel.
-    s = s.replaceAll(RegExp(r'[\u064B-\u0652\u0670\u0640]'), '');
+    // Diacritics, sukun, dagger alif, tatweel (full harakat range).
+    s = s.replaceAll(RegExp(r'[\u064B-\u065F\u0670\u0640]'), '');
     // Alef forms.
     s = s.replaceAll(RegExp(r'[أإآٱ]'), 'ا');
     // Alef maqsura / hamza on ya & waw.
@@ -94,6 +124,16 @@ class VoiceDhikrMatcher {
       final n = _countNonOverlapping(text, variant);
       if (n > best) best = n;
     }
+    if (best > 0) return best;
+    // Far / noisy speech often produces a 1–2 letter recognition error
+    // (e.g. «سحبان الله» for «سبحان الله»). Fall back to approximate
+    // matching so a quiet repetition is never silently missed.
+    for (final variant in list) {
+      if (variant.isEmpty || variant.length < 5) continue;
+      final allowed = variant.length >= 9 ? 2 : 1;
+      final n = _countFuzzy(text, variant, allowed);
+      if (n > best) best = n;
+    }
     return best;
   }
 
@@ -107,6 +147,68 @@ class VoiceDhikrMatcher {
       from = i + needle.length;
     }
     return count;
+  }
+
+  /// Approximate occurrence count for noisy transcripts: finds windows
+  /// whose edit distance to [needle] is within [maxDistance].
+  static int _countFuzzy(String haystack, String needle, int maxDistance) {
+    var count = 0;
+    var from = 0;
+    final needleLen = needle.length;
+    while (from < haystack.length) {
+      var bestIndex = -1;
+      var bestDist = maxDistance + 1;
+      var bestLen = needleLen;
+      for (var windowLen = needleLen - maxDistance;
+          windowLen <= needleLen + maxDistance;
+          windowLen++) {
+        if (windowLen <= 0) continue;
+        for (var i = from; i + windowLen <= haystack.length; i++) {
+          final window = haystack.substring(i, i + windowLen);
+          final dist = _editDistanceAtMost(window, needle, maxDistance);
+          if (dist != null && dist < bestDist) {
+            bestDist = dist;
+            bestIndex = i;
+            bestLen = windowLen;
+            if (dist == 0) break;
+          }
+        }
+        if (bestDist == 0) break;
+      }
+      if (bestIndex < 0) break;
+      count++;
+      from = bestIndex + bestLen;
+    }
+    return count;
+  }
+
+  /// Levenshtein distance, returning `null` when it exceeds [atMost].
+  /// Early-exits as soon as the minimal possible distance is exceeded
+  /// that budget, so long windows stay fast.
+  static int? _editDistanceAtMost(String a, String b, int atMost) {
+    if ((a.length - b.length).abs() > atMost) return null;
+    var prev = List<int>.generate(b.length + 1, (j) => j);
+    var cur = List<int>.filled(b.length + 1, 0);
+    for (var i = 1; i <= a.length; i++) {
+      cur[0] = i;
+      var rowMin = cur[0];
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1) ? 0 : 1;
+        var v = prev[j] + 1;
+        final del = cur[j - 1] + 1;
+        if (del < v) v = del;
+        final sub = prev[j - 1] + cost;
+        if (sub < v) v = sub;
+        cur[j] = v;
+        if (v < rowMin) rowMin = v;
+      }
+      if (rowMin > atMost) return null;
+      final tmp = prev;
+      prev = cur;
+      cur = tmp;
+    }
+    final d = prev[b.length];
+    return d <= atMost ? d : null;
   }
 
   /// Does [transcript] contain any known dhikr? Returns its index/score

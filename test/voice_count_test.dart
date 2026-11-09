@@ -37,6 +37,23 @@ void main() {
     test('لا يعدّ ذكرًا آخر', () {
       expect(VoiceDhikrMatcher.count('الحمد لله', subhanAllah), 0);
     });
+
+    test('يتحمل أخطاء التعرّف من بعيد (سحبان / صبحان)', () {
+      expect(VoiceDhikrMatcher.count('سحبان الله', subhanAllah), 1);
+      expect(VoiceDhikrMatcher.count('صبحان الله', subhanAllah), 1);
+      expect(VoiceDhikrMatcher.count('سبحن الله', subhanAllah), 1);
+    });
+
+    test('لا يقبل أبعد من خطأين', () {
+      expect(VoiceDhikrMatcher.count('كزبان قلّة', subhanAllah), 0);
+      expect(VoiceDhikrMatcher.count('xyz', subhanAllah), 0);
+    });
+
+    test('عبارات السياق موجودة لكل ذكر', () {
+      for (var i = 0; i < 6; i++) {
+        expect(VoiceDhikrMatcher.biasPhrases(i), isNotEmpty);
+      }
+    });
   });
 
   group('VoiceCountTracker', () {

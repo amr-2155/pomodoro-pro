@@ -1644,6 +1644,31 @@ class _TasbeehViewState extends State<_TasbeehView>
                             _voice.isActive ? accent : Colors.grey[500],
                       ),
                       const SizedBox(width: 5),
+                      // Mic-level feedback: turns green when your voice is
+                      // loud enough to be heard from farther away.
+                      if (_voice.isActive) ...[
+                        Container(
+                          width: 36,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerRight,
+                            widthFactor: _voice.soundLevel.clamp(0.0, 1.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _voice.soundLevel > 0.05
+                                    ? accent
+                                    : accent.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
                       Flexible(
                         child: Text(
                           _voice.isActive
