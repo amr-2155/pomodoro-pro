@@ -26,10 +26,14 @@ Try it online: **https://amr-2155.github.io/pomodoro-pro/**
 
 ## 📲 Download Android APK
 
-Grab the latest APK from the **Releases** page:
-**https://github.com/amr-2155/pomodoro-pro/releases**
+This is the **main app** — the same build as the web version, packaged for Android.
+
+Direct, always-latest download (arm64):
+**https://github.com/amr-2155/pomodoro-pro/releases/latest/download/pomodoro-pro-arm64.apk**
 
 > On your phone, enable "Install from unknown sources" to sideload the APK.
+> The `releases/latest/download/pomodoro-pro-arm64.apk` link always resolves to
+> the newest release, so it never points at an old build.
 
 ## 🛠️ Build from source
 

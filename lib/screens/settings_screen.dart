@@ -129,8 +129,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 12),
             _buildSectionTitle(l10n.aboutSettings),
-            if (!PwaService.isStandalone)
-              _buildActionTile(l10n.installApp, l10n.installAppDesc, Icons.install_mobile_rounded, () => _installPwa(context)),
+            if (PwaService.canOfferInstall)
+              PwaService.isAndroid
+                  // On Android the real app is the APK; a PWA shortcut is a
+                  // different, weaker thing, so offer the main app instead.
+                  ? _buildActionTile(l10n.downloadApk, l10n.downloadApkDesc, Icons.android_rounded, () => _downloadApk(context))
+                  : _buildActionTile(l10n.installApp, l10n.installAppDesc, Icons.install_mobile_rounded, () => _installPwa(context)),
             _buildActionTile(l10n.appVersion, _pkgVersion ?? l10n.builtWith, Icons.info_outline_rounded, () {}),
 
             const SizedBox(height: 40),
@@ -663,14 +667,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     DataBackupService.pickAndRestore(context);
   }
 
+  /// Desktop browsers: installation happens through the browser menu.
   void _installPwa(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Use your browser menu > "Add to Home screen"'),
+        content: Text(l10n.addToHomeHint),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  /// Android browsers: fetch the main app (APK) instead of installing a PWA
+  /// shortcut, so the installed app is the real one.
+  void _downloadApk(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    PwaService.downloadApk();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.apkDownloadStarted),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 5),
       ),
     );
   }

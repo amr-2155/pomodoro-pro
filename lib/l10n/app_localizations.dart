@@ -272,6 +272,22 @@ class AppLocalizations {
     'ar': 'إضافة التطبيق إلى الشاشة الرئيسية',
     'en': 'Add Pomodoro Pro to your home screen',
   });
+  String get downloadApk => _t({
+    'ar': 'تحميل تطبيق الأندرويد (APK)',
+    'en': 'Download the Android app (APK)',
+  });
+  String get downloadApkDesc => _t({
+    'ar': 'التطبيق الأساسي كامل — يشتغل أوفلاين وفي الخلفية',
+    'en': 'The full main app — works offline and in the background',
+  });
+  String get apkDownloadStarted => _t({
+    'ar': 'بدأ تحميل التطبيق الأساسي… ثبّته بعد ما ينزل.',
+    'en': 'Downloading the main app… install it once it finishes.',
+  });
+  String get addToHomeHint => _t({
+    'ar': 'من قائمة المتصفح اختار «إضافة إلى الشاشة الرئيسية».',
+    'en': 'From the browser menu choose "Add to Home screen".',
+  });
   String get appVersion => 'Pomodoro Pro';
   String get builtWith => _t({
     'ar': 'صُنع باستخدام Flutter',
