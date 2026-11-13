@@ -29,7 +29,9 @@ class TimerScreen extends StatefulWidget {
 class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
   String? _selectedProjectId;
   int _quoteOffset = 0;
-  bool _tasbihMode = true;
+  /// Opens on the timer, not the tasbeeh: the timer is the primary action and
+  /// the tasbeeh stays one tap away on the mode switch.
+  bool _tasbihMode = false;
   final FocusNode _focusNode = FocusNode();
   final GlobalKey _calcKey = GlobalKey();
   /// Held directly instead of being looked up from [context] in [dispose]:
@@ -60,25 +62,8 @@ class _TimerScreenState extends State<TimerScreen> with WidgetsBindingObserver {
       if (timerService.pendingRestorePrompt) {
         _showRestoreDialog(timerService);
       }
-      if (DatabaseService.isFreshInstall) _scrollToCalculatorOnce();
       _focusNode.requestFocus();
     });
-  }
-
-  /// First launch only: gently bring the Dhikr & Time calculator into
-  /// view so it is visible without manual searching or scrolling.
-  /// Never runs for existing installs or on later opens.
-  Future<void> _scrollToCalculatorOnce() async {
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    final ctx = _calcKey.currentContext;
-    if (ctx == null || !ctx.mounted) return;
-    await Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOutCubic,
-      alignment: 0.05,
-    );
   }
 
   @override
